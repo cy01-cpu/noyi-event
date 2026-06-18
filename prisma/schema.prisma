@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Event {
+  id            String         @id @default(cuid())
+  title         String
+  description   String?
+  location      String?
+  startAt       DateTime
+  endAt         DateTime?
+  capacity      Int?
+  isPublic      Boolean        @default(true)
+  requirePayment Boolean       @default(false)
+  amount        Float?
+  status        EventStatus    @default(DRAFT)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  registrations Registration[]
+}
+
+model Registration {
+  id        String             @id @default(cuid())
+  eventId   String
+  event     Event              @relation(fields: [eventId], references: [id])
+  name      String
+  email     String
+  phone     String?
+  note      String?
+  token     String             @unique @default(cuid())
+  isPaid    Boolean            @default(false)
+  paidAt    DateTime?
+  status    RegistrationStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  checkIn   CheckIn?
+}
+
+model CheckIn {
+  id             String       @id @default(cuid())
+  registrationId String       @unique
+  registration   Registration @relation(fields: [registrationId], references: [id])
+  checkedAt      DateTime     @default(now())
+  gate           String?
+}
+
+enum EventStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum RegistrationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}

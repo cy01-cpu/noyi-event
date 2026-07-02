@@ -16,13 +16,17 @@ model Event {
   capacity      Int?
   isPublic      Boolean        @default(true)
   requirePayment Boolean       @default(false)
-  amount        Float?
+  amount        Int?
   status        EventStatus    @default(DRAFT)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   registrations Registration[]
 }
 
+// TODO: 疑似重複提醒邏輯（後台顯示用，不阻擋報名送出）
+// 查詢同一活動內 email+姓名相同的報名：
+// - 若 branch 不同（或其中一筆有填一筆沒填）→ 不標記，大概率是不同真人
+// - 若 branch 相同（或兩筆都沒填）→ 標記「⚠️ 疑似重複」，交由承辦人自行判斷
 model Registration {
   id        String             @id @default(cuid())
   eventId   String
@@ -30,6 +34,7 @@ model Registration {
   name      String
   email     String
   phone     String?
+  branch    String?
   note      String?
   token     String             @unique @default(cuid())
   isPaid    Boolean            @default(false)
@@ -38,6 +43,9 @@ model Registration {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   checkIn   CheckIn?
+
+  @@unique([eventId, email, name, phone])
+  @@index([eventId])
 }
 
 model CheckIn {
@@ -59,4 +67,5 @@ enum RegistrationStatus {
   PENDING
   CONFIRMED
   CANCELLED
+  WAITLISTED
 }

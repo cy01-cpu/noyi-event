@@ -197,6 +197,45 @@ gh repo view --web
 
 ---
 
+## PowerShell 注意事項
+
+本機開發環境（Windows）常用 PowerShell，語法與 Bash 不同，容易踩雷：
+
+- **不支援 `&&` 串接指令**：PowerShell 5.1 會直接報錯（parser error）。
+  多個指令請分行執行，或用 `;` 串接（但 `;` 不會檢查前一個指令是否成功）：
+
+  ```powershell
+  # ❌ 錯誤：PowerShell 5.1 不支援
+  git add -A && git commit -m "訊息"
+
+  # ✅ 正確：分行執行
+  git add -A
+  git commit -m "訊息"
+
+  # ✅ 正確：用 ; 串接（不保證前一步成功才執行下一步）
+  git add -A; git commit -m "訊息"
+
+  # ✅ 正確：需要「前一步成功才執行」時
+  git add -A; if ($?) { git commit -m "訊息" }
+  ```
+
+- **常見指令對照表**：
+
+  | 用途 | Bash / cmd.exe | PowerShell |
+  |---|---|---|
+  | 刪除資料夾（含內容） | `rd /s /q <資料夾>` 或 `rm -rf <資料夾>` | `Remove-Item -Recurse -Force <資料夾>` |
+  | 刪除檔案 | `del <檔名>` | `Remove-Item <檔名>` |
+  | 列出檔案 | `ls` / `dir` | `Get-ChildItem`（別名 `ls`、`dir` 可用） |
+  | 查看檔案內容 | `cat <檔名>` | `Get-Content <檔名>` |
+  | 建立資料夾 | `mkdir -p <路徑>` | `New-Item -ItemType Directory -Force <路徑>` |
+  | 設定環境變數（單次） | `VAR=x cmd` | `$env:VAR = 'x'; cmd` |
+  | 複製檔案 | `cp <來源> <目的>` | `Copy-Item <來源> <目的>` |
+
+- Claude Code 內建的 Bash 工具使用 Git Bash（POSIX sh），上述 `&&` 寫法在該工具中可正常使用；
+  只有在**使用者自己於 PowerShell 終端機**手動下指令時，才需要改用上述對照寫法。
+
+---
+
 ## ⚠️ 破壞性操作：需先取得同意
 
 以下指令執行後**無法復原**，Claude Code 執行前必須先說明原因並等待確認：

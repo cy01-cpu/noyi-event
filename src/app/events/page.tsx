@@ -91,6 +91,9 @@ export default async function EventsPage() {
                     <div className="flex items-center gap-1.5">
                       <CopyRegisterLinkButton eventId={event.id} />
                       <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/events/${event.id}/edit`}>編輯</Link>
+                      </Button>
+                      <Button variant="ghost" size="sm" asChild>
                         <Link href={`/events/${event.id}/checkin-scan`}>
                           開始掃描
                         </Link>

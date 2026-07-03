@@ -3,6 +3,7 @@ import { format } from "date-fns"
 
 import { prisma } from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
+import { TogglePaidButton } from "./toggle-paid-button"
 import {
   Table,
   TableBody,
@@ -48,6 +49,15 @@ export default async function AttendeesPage({
 
   const checkedInCount = registrations.filter((r) => r.checkIn).length
 
+  // 「應繳」的計算基準採 status=CONFIRMED 的筆數：候補中（名額釋出前
+  // 不確定能否參加）與已取消的報名，不應被要求繳費，計入只會讓
+  // 對帳目標失真。已繳費筆數則不分狀態直接數 isPaid（若候補者提前
+  // 繳了費仍如實呈現，交由承辦人自行判斷處理）。
+  const confirmedCount = registrations.filter(
+    (r) => r.status === "CONFIRMED"
+  ).length
+  const paidCount = registrations.filter((r) => r.isPaid).length
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <Link
@@ -60,6 +70,8 @@ export default async function AttendeesPage({
       <h1 className="mb-1 text-xl font-semibold">{event.title}・報到名單</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         總報名人數 {registrations.length} ・ 已報到 {checkedInCount}
+        {event.requirePayment &&
+          ` ・ 已繳費 ${paidCount} / 應繳 ${confirmedCount}`}
       </p>
 
       <div className="rounded-xl border">
@@ -70,13 +82,14 @@ export default async function AttendeesPage({
               <TableHead>Email</TableHead>
               <TableHead>報名狀態</TableHead>
               <TableHead>報到狀態</TableHead>
+              {event.requirePayment && <TableHead>繳費狀態</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={event.requirePayment ? 5 : 4}
                   className="py-8 text-center text-muted-foreground"
                 >
                   目前還沒有人報名
@@ -99,6 +112,21 @@ export default async function AttendeesPage({
                         }`
                       : "尚未報到"}
                   </TableCell>
+                  {event.requirePayment && (
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">
+                          {r.isPaid
+                            ? `已繳費${r.paidAt ? `（${format(r.paidAt, "MM/dd")}）` : ""}`
+                            : "未繳費"}
+                        </span>
+                        <TogglePaidButton
+                          registrationId={r.id}
+                          isPaid={r.isPaid}
+                        />
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

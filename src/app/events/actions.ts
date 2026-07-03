@@ -4,14 +4,16 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
 import { prisma } from "@/lib/prisma"
-import { eventFormSchema, type EventFormValues } from "@/lib/validations/event"
+import { eventFormSchema, type EventEditValues } from "@/lib/validations/event"
 
 type CreateEventResult =
   | { success: true }
   | { success: false; errors: Record<string, string[] | undefined> }
 
+// 參數型別用共用表單元件的 EventEditValues（狀態範圍較寬），
+// 但驗證仍用建立專用的 eventFormSchema：新活動狀態只允許 DRAFT/OPEN。
 export async function createEvent(
-  values: EventFormValues
+  values: EventEditValues
 ): Promise<CreateEventResult> {
   const parsed = eventFormSchema.safeParse(values)
 

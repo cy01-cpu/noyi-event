@@ -88,7 +88,19 @@ export default async function EventsPage() {
                       : "免費"}
                   </TableCell>
                   <TableCell>
-                    <CopyRegisterLinkButton eventId={event.id} />
+                    <div className="flex items-center gap-1.5">
+                      <CopyRegisterLinkButton eventId={event.id} />
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/events/${event.id}/checkin-scan`}>
+                          開始掃描
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/events/${event.id}/attendees`}>
+                          報到名單
+                        </Link>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

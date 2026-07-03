@@ -7,6 +7,7 @@ import {
   registrationFormSchema,
   type RegistrationFormValues,
 } from "@/lib/validations/registration"
+import { sendRegistrationConfirmation } from "@/lib/email/registration-confirmation"
 
 type CreateRegistrationResult =
   | { success: true; status: "CONFIRMED" | "WAITLISTED" }
@@ -62,6 +63,14 @@ export async function createRegistration(
         },
       })
     })
+
+    try {
+      await sendRegistrationConfirmation(registration, event)
+    } catch (emailErr) {
+      // 資料庫已成功寫入才是最重要的事，寄信失敗不應讓報名流程失敗。
+      // 先記錄錯誤，之後可以再考慮加上重試機制。
+      console.error("寄送報名確認信失敗:", emailErr)
+    }
 
     return {
       success: true,

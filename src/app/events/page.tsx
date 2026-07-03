@@ -4,6 +4,7 @@ import { format } from "date-fns"
 import { prisma } from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { CopyRegisterLinkButton } from "@/components/copy-register-link-button"
 import {
   Table,
   TableBody,
@@ -51,13 +52,14 @@ export default async function EventsPage() {
               <TableHead>名額</TableHead>
               <TableHead>狀態</TableHead>
               <TableHead>是否需繳費</TableHead>
+              <TableHead>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {events.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-8 text-center text-muted-foreground"
                 >
                   目前還沒有活動，點右上角「建立活動」開始新增
@@ -84,6 +86,9 @@ export default async function EventsPage() {
                     {event.requirePayment
                       ? `需繳費（NT$ ${((event.amount ?? 0) / 100).toLocaleString()}）`
                       : "免費"}
+                  </TableCell>
+                  <TableCell>
+                    <CopyRegisterLinkButton eventId={event.id} />
                   </TableCell>
                 </TableRow>
               ))

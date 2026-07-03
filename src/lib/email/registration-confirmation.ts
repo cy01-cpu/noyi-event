@@ -8,6 +8,18 @@ import { generateQrCodeBuffer } from "@/lib/qrcode"
 // 正式上線前，需先在 Resend 後台驗證公司網域，再把下方 from 改成該網域的地址。
 const FROM_ADDRESS = "諾億保經活動通知 <onboarding@resend.dev>"
 
+// 信件內容是手寫 HTML 字串（非 JSX，不會自動跳脫），而 registration.name
+// 來自公開報名表單、event.title/location 也屬自由輸入。凡是要插進 HTML 的
+// 動態值都必須先跳脫，避免有人在姓名欄塞入標籤污染公司名義寄出的信件內容。
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
 function formatEventDateRange(event: Event) {
   const start = format(event.startAt, "yyyy/MM/dd HH:mm")
   if (!event.endAt) return start
@@ -19,7 +31,9 @@ export async function sendRegistrationConfirmation(
   event: Event
 ) {
   const dateRange = formatEventDateRange(event)
-  const location = event.location ?? "未提供"
+  const safeName = escapeHtml(registration.name)
+  const safeTitle = escapeHtml(event.title)
+  const safeLocation = escapeHtml(event.location ?? "未提供")
 
   if (registration.status === "CONFIRMED") {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
@@ -36,10 +50,10 @@ export async function sendRegistrationConfirmation(
       to: registration.email,
       subject: `報名成功｜${event.title}`,
       html: `
-        <p>您好 ${registration.name}，</p>
-        <p>您已成功報名「${event.title}」。</p>
+        <p>您好 ${safeName}，</p>
+        <p>您已成功報名「${safeTitle}」。</p>
         <p>活動時間：${dateRange}</p>
-        <p>活動地點：${location}</p>
+        <p>活動地點：${safeLocation}</p>
         <p>以下 QR Code 為您的報到憑證，活動當天請出示（截圖保存或列印皆可）。</p>
       `,
       attachments: [
@@ -64,10 +78,10 @@ export async function sendRegistrationConfirmation(
     to: registration.email,
     subject: `候補通知｜${event.title}`,
     html: `
-      <p>您好 ${registration.name}，</p>
-      <p>「${event.title}」目前活動名額已滿，已將您列入候補名單。</p>
+      <p>您好 ${safeName}，</p>
+      <p>「${safeTitle}」目前活動名額已滿，已將您列入候補名單。</p>
       <p>活動時間：${dateRange}</p>
-      <p>活動地點：${location}</p>
+      <p>活動地點：${safeLocation}</p>
       <p>若後續有名額釋出，將另行寄信通知您，謝謝您的耐心等候。</p>
     `,
   })

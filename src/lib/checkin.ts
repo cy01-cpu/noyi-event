@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 export type CheckInResult =
   | { success: true; name: string; eventTitle: string; checkedAt: Date }
   | { success: false; reason: "not_found" }
+  | { success: false; reason: "event_mismatch" }
   | { success: false; reason: "not_confirmed"; status: string }
   | {
       success: false
@@ -15,8 +16,10 @@ export type CheckInResult =
 
 export async function performCheckIn(
   token: string,
-  gate?: string
+  options?: { gate?: string; expectedEventId?: string }
 ): Promise<CheckInResult> {
+  const { gate, expectedEventId } = options ?? {}
+
   const registration = await prisma.registration.findUnique({
     where: { token },
     include: { event: true },
@@ -24,6 +27,12 @@ export async function performCheckIn(
 
   if (!registration) {
     return { success: false, reason: "not_found" }
+  }
+
+  // 掃描頁會帶入目前活動的 id：報名不屬於本活動時擋下，避免現場誤掃
+  // 別場活動的 QR Code。歸屬檢查直接用這裡查回的資料，不另外多查一次。
+  if (expectedEventId && registration.eventId !== expectedEventId) {
+    return { success: false, reason: "event_mismatch" }
   }
 
   if (registration.status !== "CONFIRMED") {

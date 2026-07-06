@@ -34,16 +34,19 @@ export function AdminLoginForm({ from }: { from: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-sm px-4 py-16">
+    <div className="theme-forest flex-1 bg-background text-foreground">
+      <div className="mx-auto max-w-sm px-4 py-16">
       <Card>
         <CardHeader>
-          <CardTitle>內部頁面</CardTitle>
-          <CardDescription>請輸入通行碼以繼續</CardDescription>
+          <CardTitle className="text-xl">內部頁面</CardTitle>
+          <CardDescription className="text-base">
+            請輸入通行碼以繼續
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p className="rounded-lg bg-red-100 px-3.5 py-2.5 text-base text-red-800">
                 {error}
               </p>
             )}
@@ -63,6 +66,7 @@ export function AdminLoginForm({ from }: { from: string }) {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

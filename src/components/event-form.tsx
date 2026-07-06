@@ -87,7 +87,7 @@ export function EventForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         {formError && (
-          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <p className="rounded-lg bg-red-100 px-3.5 py-2.5 text-base text-red-800">
             {formError}
           </p>
         )}

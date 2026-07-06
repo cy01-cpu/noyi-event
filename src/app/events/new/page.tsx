@@ -14,17 +14,18 @@ import {
 
 export default function NewEventPage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="theme-orange flex-1 bg-background text-foreground">
+      <div className="mx-auto max-w-2xl px-4 py-8">
       <Link
         href="/events"
-        className="mb-4 inline-block text-sm text-muted-foreground hover:underline"
+        className="mb-4 inline-block text-base text-muted-foreground hover:underline"
       >
         ← 返回活動列表
       </Link>
 
       <Card>
         <CardHeader>
-          <CardTitle>建立活動</CardTitle>
+          <CardTitle className="text-xl">建立活動</CardTitle>
           <CardDescription>請填寫以下資訊，建立一場新的活動</CardDescription>
         </CardHeader>
         <CardContent>
@@ -51,6 +52,7 @@ export default function NewEventPage() {
           />
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

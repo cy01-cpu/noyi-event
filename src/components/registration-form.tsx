@@ -70,10 +70,10 @@ export function RegistrationForm({ eventId }: { eventId: string }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>
+          <CardTitle className="text-xl">
             {result === "CONFIRMED" ? "報名成功" : "已加入候補名單"}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-base">
             {result === "CONFIRMED"
               ? "報名成功，請注意信箱"
               : "目前活動人數已滿，您已成功加入候補名單，若有名額釋出將以信箱通知您"}
@@ -86,13 +86,13 @@ export function RegistrationForm({ eventId }: { eventId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>報名表單</CardTitle>
+        <CardTitle className="text-xl">報名表單</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {formError && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p className="rounded-lg bg-red-100 px-3.5 py-2.5 text-base text-red-800">
                 {formError}
               </p>
             )}

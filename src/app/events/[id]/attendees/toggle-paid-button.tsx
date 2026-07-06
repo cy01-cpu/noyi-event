@@ -29,13 +29,13 @@ export function TogglePaidButton({
     <div className="flex items-center gap-1.5">
       <Button
         variant="outline"
-        size="xs"
+        size="sm"
         onClick={handleClick}
         disabled={isPending}
       >
         {isPending ? "更新中…" : isPaid ? "取消標記" : "標記已繳費"}
       </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {error && <span className="text-sm text-destructive">{error}</span>}
     </div>
   )
 }

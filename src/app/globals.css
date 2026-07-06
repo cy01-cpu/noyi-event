@@ -7,9 +7,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  /* @theme inline 在建置期解析，讀不到 next/font 於執行期注入的
+     --font-geist-* 變數（原本的 var(--font-sans) 更是循環引用），
+     必須寫字面字型名稱。中文回退到繁中系統字型。 */
+  --font-sans: "Geist", "Geist Fallback", "PingFang TC",
+    "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --font-heading: "Geist", "Geist Fallback", "PingFang TC",
+    "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -46,6 +51,19 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-primary-hover: var(--primary-hover);
+  /* 品牌色票（見下方 :root 定義），供 text-brand-orange-primary 等工具類使用 */
+  --color-brand-orange-primary: var(--brand-orange-primary);
+  --color-brand-orange-deep: var(--brand-orange-deep);
+  --color-brand-orange-secondary: var(--brand-orange-secondary);
+  --color-brand-orange-accent: var(--brand-orange-accent);
+  --color-brand-orange-soft-bg: var(--brand-orange-soft-bg);
+  --color-brand-orange-text: var(--brand-orange-text);
+  --color-forest-deep-moss: var(--forest-deep-moss);
+  --color-forest-foggy-spruce: var(--forest-foggy-spruce);
+  --color-forest-linen-brown: var(--forest-linen-brown);
+  --color-forest-morning-mist: var(--forest-morning-mist);
+  --color-forest-text-dark: var(--forest-text-dark);
 }
 
 :root {
@@ -81,6 +99,73 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --primary-hover: oklch(0.3 0 0);
+
+  /* ===== 諾億品牌色票 =====
+     所有頁面都套用 .theme-orange 或 .theme-forest 其中之一，
+     這裡的原始色票供主題類別與工具類引用。 */
+  --brand-orange-primary: #ff5722; /* 熱情主色：僅裝飾（圖示、漸層），當文字對白底僅 3.2:1，不符 AA */
+  --brand-orange-deep: #c2410c; /* 可及性橘：按鈕填色/連結/重點文字，對白色 5.2:1 ✓ */
+  --brand-orange-secondary: #ff9800; /* 活力輔色：僅裝飾或搭配深色文字（#3E2723 對其 6.4:1 ✓） */
+  --brand-orange-accent: #ffeb3b; /* 點綴亮色：僅極小面積裝飾，不做文字或大面積填色 */
+  --brand-orange-soft-bg: #fff3e0; /* 柔和背景 */
+  --brand-orange-text: #3e2723; /* 主文字，對 soft-bg 12.6:1 ✓ */
+  --brand-orange-text-muted: #6d4c41; /* 次要文字，對 soft-bg 7.0:1、白底 7.7:1 ✓ */
+  --forest-deep-moss: #2c402e; /* 深苔蘚綠：主要按鈕/大面積深色，白字對其 11.2:1 ✓ */
+  --forest-foggy-spruce: #4a5d4e; /* 霧杉綠：次要文字，對晨霧白 6.5:1 ✓ */
+  --forest-linen-brown: #8a6f57; /* 亞麻棕：僅邊框/裝飾（對晨霧白 4.3:1，UI 邊界 ≥3:1 ✓；當文字不足 4.5:1，禁用） */
+  --forest-morning-mist: #f4f6f0; /* 晨霧白：頁面背景 */
+  --forest-text-dark: #1a281f; /* 主文字，對晨霧白 15:1 ✓ */
+}
+
+/* ===== 主題作用域 =====
+   覆蓋 shadcn 語意變數，讓 Button/Card/Input 等元件自動換色。
+   每頁根元素掛 .theme-orange（事前規劃）或 .theme-forest（活動當天）
+   搭配 bg-background text-foreground。
+   注意：這裡所有「文字 × 底色」組合都經過 WCAG AA（4.5:1）實算，
+   調整任何色值前請重新計算對比度。 */
+.theme-orange {
+  --background: var(--brand-orange-soft-bg);
+  --foreground: var(--brand-orange-text);
+  --card: #ffffff;
+  --card-foreground: var(--brand-orange-text);
+  --popover: #ffffff;
+  --popover-foreground: var(--brand-orange-text);
+  --primary: var(--brand-orange-deep);
+  --primary-foreground: #ffffff;
+  --primary-hover: #9a3412; /* hover 採加深而非變淡，白字對其 6.9:1 ✓ */
+  --secondary: #ffe0b2;
+  --secondary-foreground: #7c2d12; /* 對 #ffe0b2 7.4:1 ✓ */
+  --muted: #ffe8cc;
+  --muted-foreground: var(--brand-orange-text-muted);
+  --accent: #ffe0b2;
+  --accent-foreground: var(--brand-orange-text);
+  --destructive: #b91c1c; /* 對白底 6.5:1 ✓（shadcn 預設紅偏亮，長輩不易讀） */
+  --border: #f3d9bd; /* 裝飾性分隔線 */
+  --input: #a87848; /* 輸入框邊框，對白底 3.9:1，符合 UI 元件 ≥3:1 */
+  --ring: var(--brand-orange-deep);
+}
+
+.theme-forest {
+  --background: var(--forest-morning-mist);
+  --foreground: var(--forest-text-dark);
+  --card: #ffffff;
+  --card-foreground: var(--forest-text-dark);
+  --popover: #ffffff;
+  --popover-foreground: var(--forest-text-dark);
+  --primary: var(--forest-deep-moss);
+  --primary-foreground: #ffffff;
+  --primary-hover: #1f2e21;
+  --secondary: #dde5d8;
+  --secondary-foreground: var(--forest-deep-moss); /* 對 #dde5d8 8.7:1 ✓ */
+  --muted: #e6ebe0;
+  --muted-foreground: var(--forest-foggy-spruce);
+  --accent: #dde5d8;
+  --accent-foreground: var(--forest-text-dark);
+  --destructive: #b91c1c;
+  --border: #c9d2c0;
+  --input: #6b7f6e; /* 對白底 4.3:1，UI 元件 ≥3:1 ✓ */
+  --ring: var(--forest-deep-moss);
 }
 
 .dark {
@@ -126,5 +211,8 @@
   }
   html {
     @apply font-sans;
+    /* 全站基礎字級 16px → 17px（106.25%）：使用者含 65 歲以上長輩。
+       rem 尺寸全數等比放大：text-base 17px、text-sm 14.9px（仍 ≥14px 下限）。 */
+    font-size: 106.25%;
   }
 }

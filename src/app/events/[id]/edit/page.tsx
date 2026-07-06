@@ -16,8 +16,10 @@ export default async function EditEventPage({
 
   if (!event) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <p className="text-lg font-medium">找不到此活動</p>
+      <div className="theme-orange flex-1 bg-background text-foreground">
+        <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+          <p className="text-lg font-medium">找不到此活動</p>
+        </div>
       </div>
     )
   }

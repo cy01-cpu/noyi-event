@@ -25,12 +25,12 @@ export function CopyRegisterLinkButton({ eventId }: { eventId: string }) {
         aria-label="複製報名連結"
       >
         {copied ? (
-          <Check className="size-3.5" />
+          <Check className="size-4.5" />
         ) : (
-          <Copy className="size-3.5" />
+          <Copy className="size-4.5" />
         )}
       </Button>
-      {copied && <span className="text-xs text-muted-foreground">已複製</span>}
+      {copied && <span className="text-sm text-muted-foreground">已複製</span>}
     </div>
   )
 }

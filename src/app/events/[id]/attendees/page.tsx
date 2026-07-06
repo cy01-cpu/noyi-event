@@ -4,20 +4,21 @@ import { format } from "date-fns"
 import { prisma } from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
 import { TogglePaidButton } from "./toggle-paid-button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 
 const registrationStatusLabel: Record<string, string> = {
   PENDING: "待處理",
   CONFIRMED: "已確認",
   CANCELLED: "已取消",
   WAITLISTED: "候補中",
+}
+
+// 實心淺底 pill：文字皆為 *-800 深色，對 *-100 淺底 ≥6:1（WCAG AA ✓）
+const registrationStatusBadgeClass: Record<string, string> = {
+  PENDING: "bg-muted text-muted-foreground",
+  CONFIRMED: "bg-green-100 text-green-800",
+  CANCELLED: "bg-red-100 text-red-800",
+  WAITLISTED: "bg-amber-100 text-amber-800",
 }
 
 export default async function AttendeesPage({
@@ -30,8 +31,10 @@ export default async function AttendeesPage({
 
   if (!event) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <p className="text-lg font-medium">找不到此活動</p>
+      <div className="theme-forest flex-1 bg-background text-foreground">
+        <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+          <p className="text-lg font-medium">找不到此活動</p>
+        </div>
       </div>
     )
   }
@@ -59,79 +62,87 @@ export default async function AttendeesPage({
   const paidCount = registrations.filter((r) => r.isPaid).length
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <Link
-        href="/events"
-        className="mb-4 inline-block text-sm text-muted-foreground hover:underline"
-      >
-        ← 返回活動列表
-      </Link>
+    <div className="theme-forest flex-1 bg-background text-foreground">
+      <div className="mx-auto max-w-2xl px-4 py-8">
+        <Link
+          href="/events"
+          className="mb-4 inline-block text-base text-muted-foreground hover:underline"
+        >
+          ← 返回活動列表
+        </Link>
 
-      <h1 className="mb-1 text-xl font-semibold">{event.title}・報到名單</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        總報名人數 {registrations.length} ・ 已報到 {checkedInCount}
-        {event.requirePayment &&
-          ` ・ 已繳費 ${paidCount} / 應繳 ${confirmedCount}`}
-      </p>
+        <h1 className="mb-1 text-2xl font-bold">{event.title}・報到名單</h1>
+        <p className="mb-6 text-base text-muted-foreground">
+          總報名人數 {registrations.length} ・ 已報到 {checkedInCount}
+          {event.requirePayment &&
+            ` ・ 已繳費 ${paidCount} / 應繳 ${confirmedCount}`}
+        </p>
 
-      <div className="rounded-xl border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>姓名</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>報名狀態</TableHead>
-              <TableHead>報到狀態</TableHead>
-              {event.requirePayment && <TableHead>繳費狀態</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={event.requirePayment ? 5 : 4}
-                  className="py-8 text-center text-muted-foreground"
-                >
-                  目前還沒有人報名
-                </TableCell>
-              </TableRow>
-            ) : (
-              sorted.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell>{r.email}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
+        {sorted.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-base text-muted-foreground">
+              目前還沒有人報名
+            </CardContent>
+          </Card>
+        ) : (
+          /* 卡片式布局（原為表格，欄位多、字級放大後需橫向捲動）。
+             名單是逐筆核對用，固定單欄直列，由上往下掃視不易看錯行。 */
+          <div className="space-y-4">
+            {sorted.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="min-w-0 break-words text-lg font-semibold">
+                      {r.name}
+                    </p>
+                    <Badge className={registrationStatusBadgeClass[r.status]}>
                       {registrationStatusLabel[r.status]}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {r.checkIn
-                      ? `已報到・${format(r.checkIn.checkedAt, "yyyy/MM/dd HH:mm")}${
-                          r.checkIn.gate ? `・${r.checkIn.gate}` : ""
-                        }`
-                      : "尚未報到"}
-                  </TableCell>
-                  {event.requirePayment && (
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">
-                          {r.isPaid
-                            ? `已繳費${r.paidAt ? `（${format(r.paidAt, "MM/dd")}）` : ""}`
-                            : "未繳費"}
+                  </div>
+
+                  <p className="break-all text-base text-muted-foreground">
+                    {r.email}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.checkIn ? (
+                      <>
+                        <Badge className="bg-green-100 text-green-800">
+                          已報到
+                        </Badge>
+                        <span className="text-base text-muted-foreground">
+                          {format(r.checkIn.checkedAt, "yyyy/MM/dd HH:mm")}
+                          {r.checkIn.gate ? `・${r.checkIn.gate}` : ""}
                         </span>
-                        <TogglePaidButton
-                          registrationId={r.id}
-                          isPaid={r.isPaid}
-                        />
-                      </div>
-                    </TableCell>
+                      </>
+                    ) : (
+                      <Badge className="bg-muted text-muted-foreground">
+                        尚未報到
+                      </Badge>
+                    )}
+                  </div>
+
+                  {event.requirePayment && (
+                    <div className="flex flex-wrap items-center gap-2 border-t pt-2.5">
+                      <Badge
+                        className={
+                          r.isPaid
+                            ? "bg-green-100 text-green-800"
+                            : "bg-amber-100 text-amber-800"
+                        }
+                      >
+                        {r.isPaid
+                          ? `已繳費${r.paidAt ? `（${format(r.paidAt, "MM/dd")}）` : ""}`
+                          : "未繳費"}
+                      </Badge>
+                      <TogglePaidButton registrationId={r.id} isPaid={r.isPaid} />
+                    </div>
                   )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

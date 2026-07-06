@@ -144,7 +144,8 @@ export default function CheckinScanner({ eventId }: { eventId: string }) {
   }, [eventId])
 
   return (
-    <div className="mx-auto max-w-md space-y-4 px-4 py-8">
+    <div className="theme-forest flex-1 bg-background text-foreground">
+      <div className="mx-auto max-w-md space-y-4 px-4 py-8">
       <div className="space-y-1.5">
         <Label htmlFor="gate">目前站別/入口（選填）</Label>
         <Input
@@ -163,23 +164,27 @@ export default function CheckinScanner({ eventId }: { eventId: string }) {
           </CardHeader>
         </Card>
       ) : (
-        <div id={READER_ELEMENT_ID} className="overflow-hidden rounded-lg border" />
+        <div
+          id={READER_ELEMENT_ID}
+          className="overflow-hidden rounded-lg border-2 border-forest-linen-brown"
+        />
       )}
 
+      {/* 現場掃描回饋：字級加大、實色深字對淺底 ≥6:1（WCAG AA ✓），
+          好讓工作人員在走動、光線不佳時一眼看清結果 */}
       {feedback && (
         <div
           className={cn(
-            "rounded-lg px-3 py-2 text-sm font-medium",
-            feedback.variant === "success" &&
-              "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-            feedback.variant === "warning" &&
-              "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-            feedback.variant === "error" && "bg-destructive/10 text-destructive"
+            "rounded-lg px-4 py-3 text-lg font-semibold",
+            feedback.variant === "success" && "bg-green-100 text-green-800",
+            feedback.variant === "warning" && "bg-amber-100 text-amber-800",
+            feedback.variant === "error" && "bg-red-100 text-red-800"
           )}
         >
           {feedback.message}
         </div>
       )}
+      </div>
     </div>
   )
 }

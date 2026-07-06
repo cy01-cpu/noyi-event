@@ -27,17 +27,18 @@ export function EditEventForm({
   confirmedCount,
 }: EditEventFormProps) {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="theme-orange flex-1 bg-background text-foreground">
+      <div className="mx-auto max-w-2xl px-4 py-8">
       <Link
         href="/events"
-        className="mb-4 inline-block text-sm text-muted-foreground hover:underline"
+        className="mb-4 inline-block text-base text-muted-foreground hover:underline"
       >
         ← 返回活動列表
       </Link>
 
       <Card>
         <CardHeader>
-          <CardTitle>編輯活動</CardTitle>
+          <CardTitle className="text-xl">編輯活動</CardTitle>
           <CardDescription>
             {hasRegistrations
               ? "此活動已有人報名，繳費設定無法修改，名額有下限限制"
@@ -61,6 +62,7 @@ export function EditEventForm({
           />
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

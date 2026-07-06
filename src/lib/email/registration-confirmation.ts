@@ -1,7 +1,7 @@
 import type { Event, Registration } from "@prisma/client"
 import { format } from "date-fns"
 
-import { resend } from "@/lib/resend"
+import { getResend } from "@/lib/resend"
 import { generateQrCodeBuffer } from "@/lib/qrcode"
 
 // Resend 測試網域，僅供開發/測試使用。
@@ -30,6 +30,7 @@ export async function sendRegistrationConfirmation(
   registration: Registration,
   event: Event
 ) {
+  const resend = getResend()
   const dateRange = formatEventDateRange(event)
   const safeName = escapeHtml(registration.name)
   const safeTitle = escapeHtml(event.title)

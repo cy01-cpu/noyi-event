@@ -7,9 +7,12 @@ import { z } from "zod";
 // schema 改為共用同一份基底欄位，各自加上不同的 status 範圍後再套用
 // 共通的交叉驗證規則。
 const eventBaseFields = {
-  title: z.string().min(2, "活動名稱至少需要 2 個字"),
-  description: z.string().optional(),
-  location: z.string().optional(),
+  title: z
+    .string()
+    .min(2, "活動名稱至少需要 2 個字")
+    .max(100, "活動名稱最多 100 個字"),
+  description: z.string().max(2000, "活動說明最多 2000 個字").optional(),
+  location: z.string().max(100, "活動地點最多 100 個字").optional(),
   startAt: z.date("請選擇活動開始時間"),
   endAt: z.date().optional(),
   capacity: z.number("名額必須是數字").int("名額必須是整數").positive("名額必須大於 0").optional(),

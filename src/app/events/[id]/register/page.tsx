@@ -78,6 +78,14 @@ export default async function RegisterPage({
           </CardContent>
         </Card>
 
+        {/* 額滿時「送出前」就講清楚會變候補，不讓使用者送出後才意外發現 */}
+        {remainingSlots === 0 && (
+          <div className="mb-6 rounded-lg border-2 border-amber-300 bg-amber-100 px-4 py-3 text-base font-medium text-amber-800">
+            目前名額已滿。您仍可送出報名，送出後將列入候補名單；若有名額
+            釋出，將以 Email 通知您。
+          </div>
+        )}
+
         <RegistrationForm eventId={event.id} />
       </div>
     </div>

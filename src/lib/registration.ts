@@ -1,6 +1,7 @@
-import type { Registration } from "@prisma/client"
+import type { Event, Registration } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { promoteWaitlistedInTx } from "@/lib/promotion"
 
 type NewRegistrationData = {
   name: string
@@ -81,4 +82,93 @@ export async function insertRegistrationWithCapacityCheck(
     maxWait: 10_000,
     timeout: 15_000,
   })
+}
+
+export type CancelRegistrationOutcome =
+  | { outcome: "cancelled"; event: Event; promoted: Registration[] }
+  | { outcome: "not_found" }
+  | { outcome: "already_cancelled" }
+  | { outcome: "checked_in" }
+
+// C1 取消報名＋自動遞補。抽成獨立函式的原因同上：Server Action
+// （attendees/actions.ts）與驗證腳本共用同一份邏輯。
+// 取消與候補轉正必須在同一把 Event 行鎖交易內完成——取消 CONFIRMED
+// 釋出的名額若不在鎖內立刻遞補，會與同時進行的報名/編輯競爭
+// 產生超賣或漏補。寄信不在交易內，呼叫端拿 promoted 名單在交易外寄。
+export async function cancelRegistrationAndPromote(
+  registrationId: string
+): Promise<CancelRegistrationOutcome> {
+  return prisma.$transaction(async (tx) => {
+    // 先查出所屬活動才知道要鎖哪一列；鎖到手後再重讀報名做決定性判斷
+    const found = await tx.registration.findUnique({
+      where: { id: registrationId },
+      select: { eventId: true },
+    })
+    if (!found) return { outcome: "not_found" }
+
+    await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${found.eventId} FOR UPDATE`
+
+    const registration = await tx.registration.findUniqueOrThrow({
+      where: { id: registrationId },
+      include: { checkIn: true },
+    })
+
+    if (registration.status === "CANCELLED") {
+      return { outcome: "already_cancelled" }
+    }
+    // 已報到代表人已在現場，不應被取消（出席統計與繳費基準都會失真）
+    if (registration.checkIn) {
+      return { outcome: "checked_in" }
+    }
+
+    await tx.registration.update({
+      where: { id: registrationId },
+      data: { status: "CANCELLED" },
+    })
+
+    // 取消 CONFIRMED 釋出名額時依報名順序遞補；取消候補者則是 no-op
+    const event = await tx.event.findUniqueOrThrow({
+      where: { id: found.eventId },
+    })
+    const promoted = await promoteWaitlistedInTx(tx, event)
+
+    return { outcome: "cancelled", event, promoted }
+  }, {
+    maxWait: 10_000,
+    timeout: 15_000,
+  })
+}
+
+export type SetRefundStatusOutcome =
+  | { outcome: "updated"; registration: Registration }
+  | { outcome: "not_found" }
+  | { outcome: "not_paid" }
+
+// 退費標記（已繳費的報名被取消後，追蹤錢是否已還回去）。
+// isPaid 不動——它保留「當初確實繳過費」的歷史紀錄，refunded 是
+// 獨立標記，兩者不互相覆蓋。比照 togglePaymentStatus 做成雙向
+// 可切換（點錯可復原），取消標記時一併清空時間與經手人。
+export async function setRefundStatus(
+  registrationId: string,
+  refunded: boolean,
+  operator?: string | null
+): Promise<SetRefundStatusOutcome> {
+  const existing = await prisma.registration.findUnique({
+    where: { id: registrationId },
+    select: { isPaid: true },
+  })
+  if (!existing) return { outcome: "not_found" }
+  // 沒繳過費就沒有退費可言，擋下避免產生無意義的退費紀錄
+  if (!existing.isPaid) return { outcome: "not_paid" }
+
+  const registration = await prisma.registration.update({
+    where: { id: registrationId },
+    data: {
+      refunded,
+      refundedAt: refunded ? new Date() : null,
+      refundedBy: refunded ? operator ?? null : null,
+    },
+  })
+
+  return { outcome: "updated", registration }
 }

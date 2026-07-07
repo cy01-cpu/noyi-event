@@ -4,6 +4,8 @@ import { format } from "date-fns"
 import { prisma } from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
 import { TogglePaidButton } from "./toggle-paid-button"
+import { ToggleRefundedButton } from "./toggle-refunded-button"
+import { CancelRegistrationButton } from "./cancel-registration-button"
 import { PaidOperatorProvider } from "./paid-operator"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -62,6 +64,12 @@ export default async function AttendeesPage({
   ).length
   const paidCount = registrations.filter((r) => r.isPaid).length
 
+  // 取消確認提示與「待退費」徽章用的金額標籤（資料庫存「分」）
+  const amountLabel =
+    event.amount !== null
+      ? `NT$${(event.amount / 100).toLocaleString("zh-TW")}`
+      : null
+
   const attendeeList =
     sorted.length === 0 ? (
           <Card>
@@ -80,9 +88,28 @@ export default async function AttendeesPage({
                     <p className="min-w-0 break-words text-lg font-semibold">
                       {r.name}
                     </p>
-                    <Badge className={registrationStatusBadgeClass[r.status]}>
-                      {registrationStatusLabel[r.status]}
-                    </Badge>
+                    {/* 已取消＋已繳費的報名依退費進度顯示不同狀態：
+                        待退費用橘色與一般「已取消」（紅）區分，避免變成
+                        沒人記得處理的糊塗帳；已退費則附上日期與經手人 */}
+                    {r.status === "CANCELLED" && r.isPaid ? (
+                      r.refunded ? (
+                        <Badge className="bg-red-100 text-red-800">
+                          已取消（已退費
+                          {r.refundedAt
+                            ? ` ${format(r.refundedAt, "MM/dd")}`
+                            : ""}
+                          {r.refundedBy ? `・${r.refundedBy}` : ""}）
+                        </Badge>
+                      ) : (
+                        <Badge className="border border-orange-400 bg-orange-100 text-orange-800">
+                          已取消（待退費{amountLabel ? ` ${amountLabel}` : ""}）
+                        </Badge>
+                      )
+                    ) : (
+                      <Badge className={registrationStatusBadgeClass[r.status]}>
+                        {registrationStatusLabel[r.status]}
+                      </Badge>
+                    )}
                   </div>
 
                   <p className="break-all text-base text-muted-foreground">
@@ -107,6 +134,19 @@ export default async function AttendeesPage({
                     )}
                   </div>
 
+                  {/* C1 取消報名：已取消不重複顯示；已報到者人已到場不可取消
+                      （後端 action 另有相同的硬性檢查，這裡是介面引導）。
+                      取消 CONFIRMED 釋出的名額會在同一交易內自動遞補候補。 */}
+                  {r.status !== "CANCELLED" && !r.checkIn && (
+                    <div className="border-t pt-2.5">
+                      <CancelRegistrationButton
+                        registrationId={r.id}
+                        name={r.name}
+                        paidAmountLabel={r.isPaid ? amountLabel : null}
+                      />
+                    </div>
+                  )}
+
                   {event.requirePayment && (
                     <div className="flex flex-wrap items-center gap-2 border-t pt-2.5">
                       <Badge
@@ -124,7 +164,22 @@ export default async function AttendeesPage({
                             }`
                           : "未繳費"}
                       </Badge>
-                      <TogglePaidButton registrationId={r.id} isPaid={r.isPaid} />
+                      {/* 已取消的報名不再提供繳費標記（取消已繳費標記會
+                          連帶抹掉「待退費」追蹤），改依繳費狀態提供
+                          退費標記操作 */}
+                      {r.status === "CANCELLED" ? (
+                        r.isPaid && (
+                          <ToggleRefundedButton
+                            registrationId={r.id}
+                            refunded={r.refunded}
+                          />
+                        )
+                      ) : (
+                        <TogglePaidButton
+                          registrationId={r.id}
+                          isPaid={r.isPaid}
+                        />
+                      )}
                     </div>
                   )}
                 </CardContent>

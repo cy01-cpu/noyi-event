@@ -1,11 +1,12 @@
 /**
- * 候補轉正工具（C1 功能進入後台前的正式人工操作介面）
+ * 候補轉正工具（人工備援）
  *
- * 依報名順序（先到先得）把候補轉為已確認，並寄出與正常報名成功
- * 完全相同的確認信（含 QR Code 報到憑證）。
+ * C1 上線後，調高名額（活動編輯）與取消報名（attendees 頁）都會
+ * 自動遞補候補，正常情況不需要這支腳本；保留作為異常狀態的人工
+ * 補救工具（例如信寄失敗後需要重新確認名單、或歷史資料修復）。
  *
- * 轉正筆數 = 目前名額 − 已確認人數，在與報名端同一把 Event 行鎖的
- * 交易內計算與寫入，轉正當下有人同時報名也不會超賣。
+ * 轉正邏輯與上線程式碼共用同一份 src/lib/promotion.ts（FIFO、
+ * 與報名端同一把 Event 行鎖），這裡只是包上 CLI 與預演模式。
  *
  * 用法（在專案根目錄）：
  *   預演（只顯示會轉正誰，不寫入不寄信）：
@@ -21,7 +22,10 @@
 import "dotenv/config"
 
 import { prisma } from "../src/lib/prisma"
-import { sendRegistrationConfirmation } from "../src/lib/email/registration-confirmation"
+import {
+  promoteWaitlistedInTx,
+  sendPromotionEmails,
+} from "../src/lib/promotion"
 
 async function main() {
   const [eventId, flag] = process.argv.slice(2)
@@ -44,41 +48,20 @@ async function main() {
   // 鎖內計算可轉正名單；--execute 時在同一交易內完成狀態更新
   const result = await prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<
-      { id: string; capacity: number | null; status: string }[]
-    >`SELECT id, capacity, status FROM "Event" WHERE id = ${eventId} FOR UPDATE`
+      { id: string }[]
+    >`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`
     if (rows.length === 0) return { kind: "not_found" as const }
 
-    const { capacity, status } = rows[0]
     const event = await tx.event.findUniqueOrThrow({ where: { id: eventId } })
-
     const confirmedCount = await tx.registration.count({
       where: { eventId, status: "CONFIRMED" },
     })
-    // capacity 為 null（不限名額）理論上不會有候補，防禦性處理成全部轉正
-    const slots =
-      capacity === null ? Number.MAX_SAFE_INTEGER : capacity - confirmedCount
 
-    const promotable = await tx.registration.findMany({
-      where: { eventId, status: "WAITLISTED" },
-      orderBy: { createdAt: "asc" },
-      take: Math.max(slots, 0),
+    const promotable = await promoteWaitlistedInTx(tx, event, {
+      dryRun: !execute,
     })
 
-    if (execute && promotable.length > 0) {
-      await tx.registration.updateMany({
-        where: { id: { in: promotable.map((r) => r.id) } },
-        data: { status: "CONFIRMED" },
-      })
-    }
-
-    return {
-      kind: "ok" as const,
-      event,
-      eventStatus: status,
-      capacity,
-      confirmedCount,
-      promotable,
-    }
+    return { kind: "ok" as const, event, confirmedCount, promotable }
   }, { maxWait: 10_000, timeout: 15_000 })
 
   if (result.kind === "not_found") {
@@ -86,9 +69,9 @@ async function main() {
     process.exit(1)
   }
 
-  const { event, eventStatus, capacity, confirmedCount, promotable } = result
+  const { event, confirmedCount, promotable } = result
   console.log(
-    `活動「${event.title}」狀態=${eventStatus} 名額=${capacity} 已確認=${confirmedCount} → 可轉正 ${promotable.length} 位：`
+    `活動「${event.title}」狀態=${event.status} 名額=${event.capacity} 已確認=${confirmedCount} → 可轉正 ${promotable.length} 位：`
   )
   for (const r of promotable) {
     console.log(`  - ${r.name} <${r.email}>（報名於 ${r.createdAt.toISOString()}）`)
@@ -101,25 +84,16 @@ async function main() {
   }
 
   console.log("\n狀態已更新為 CONFIRMED，開始寄送報名成功確認信（含 QR Code）…")
-  let sent = 0
-  const failures: { name: string; email: string; reason: string }[] = []
-  for (const r of promotable) {
-    try {
-      // 寄信用轉正後的狀態（CONFIRMED 才會走含 QR Code 的成功信版型）
-      await sendRegistrationConfirmation({ ...r, status: "CONFIRMED" }, event)
-      sent += 1
-      console.log(`  ✅ 已寄出：${r.name} <${r.email}>`)
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err)
-      failures.push({ name: r.name, email: r.email, reason })
-      console.error(`  ❌ 寄送失敗：${r.name} <${r.email}> — ${reason}`)
-    }
-  }
+  const report = await sendPromotionEmails(promotable, event)
 
-  console.log(`\n完成：轉正 ${promotable.length} 位、寄信成功 ${sent} 封、失敗 ${failures.length} 封`)
-  if (failures.length > 0) {
+  console.log(
+    `\n完成：轉正 ${promotable.length} 位、寄信成功 ${report.sent} 封、失敗 ${report.failures.length} 封`
+  )
+  if (report.failures.length > 0) {
     console.log("失敗名單（狀態已是 CONFIRMED，請手動補寄或處理）：")
-    for (const f of failures) console.log(`  - ${f.name} <${f.email}>：${f.reason}`)
+    for (const f of report.failures) {
+      console.log(`  - ${f.name} <${f.email}>：${f.reason}`)
+    }
   }
 
   await prisma.$disconnect()

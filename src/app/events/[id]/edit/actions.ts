@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
 import { updateEventWithCapacityGuard } from "@/lib/events"
+import { sendPromotionEmails } from "@/lib/promotion"
 import { eventEditSchema, type EventEditValues } from "@/lib/validations/event"
 
 type UpdateEventResult =
@@ -66,7 +67,15 @@ export async function updateEvent(
     }
   }
 
+  // 名額調高觸發的候補自動轉正（C1）：狀態已在交易內定案，
+  // 這裡於交易外寄轉正通知信；失敗會記入 email-failures 清單
+  // （/api/health 可視化），不影響更新結果。
+  if (result.promoted.length > 0) {
+    await sendPromotionEmails(result.promoted, result.event)
+  }
+
   revalidatePath("/events")
   revalidatePath(`/events/${eventId}/register`)
+  revalidatePath(`/events/${eventId}/attendees`)
   redirect("/events")
 }

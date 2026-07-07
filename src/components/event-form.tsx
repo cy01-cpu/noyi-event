@@ -39,6 +39,8 @@ type EventFormProps = {
   lockPaymentFields?: boolean
   // 已有 CONFIRMED 報名時的名額下限（前端提示用，後端另做硬性驗證）
   minCapacity?: number
+  // 目前候補中的人數（C1 遞補預警用；儲存時後端會在同一交易內自動轉正）
+  waitlistedCount?: number
   submitLabel: string
   submittingLabel: string
   onSubmit: (values: EventEditValues) => Promise<EventFormResult>
@@ -52,6 +54,7 @@ export function EventForm({
   statusOptions,
   lockPaymentFields = false,
   minCapacity,
+  waitlistedCount = 0,
   submitLabel,
   submittingLabel,
   onSubmit,
@@ -64,6 +67,23 @@ export function EventForm({
   })
 
   const requirePayment = form.watch("requirePayment")
+
+  // C1 遞補預警：依目前填的名額試算儲存後會自動轉正幾位候補。
+  // 計算規則與後端 promoteWaitlistedInTx 一致——名額留空（不限）時
+  // 全部轉正；草稿/已取消狀態下後端不遞補，預警也不顯示。
+  const watchedCapacity = form.watch("capacity")
+  const watchedStatus = form.watch("status")
+  const confirmedCount = minCapacity ?? 0
+  const willPromoteCount =
+    waitlistedCount > 0 &&
+    (watchedStatus === "OPEN" || watchedStatus === "CLOSED")
+      ? watchedCapacity === undefined
+        ? waitlistedCount
+        : Math.min(
+            Math.max(watchedCapacity - confirmedCount, 0),
+            waitlistedCount
+          )
+      : 0
 
   async function handleSubmit(values: EventEditValues) {
     setFormError(null)
@@ -196,6 +216,12 @@ export function EventForm({
                 <FormDescription>
                   目前已有 {minCapacity} 人確認報名，名額不可低於 {minCapacity}
                 </FormDescription>
+              )}
+              {willPromoteCount > 0 && (
+                <p className="rounded-lg bg-amber-100 px-3.5 py-2.5 text-base text-amber-800">
+                  儲存後將依報名順序自動遞補 {willPromoteCount} 位候補為已確認，
+                  並寄送含報到 QR Code 的通知信
+                </p>
               )}
               <FormMessage />
             </FormItem>

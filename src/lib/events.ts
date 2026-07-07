@@ -1,6 +1,7 @@
-import type { EventStatus } from "@prisma/client"
+import type { Event, EventStatus, Registration } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { promoteWaitlistedInTx } from "@/lib/promotion"
 
 export type GuardedEventUpdateData = {
   title: string
@@ -16,7 +17,9 @@ export type GuardedEventUpdateData = {
 }
 
 export type GuardedEventUpdateResult =
-  | { outcome: "updated" }
+  // promoted：本次更新在同一交易內自動轉正的候補名單（C1 自動 FIFO 遞補）。
+  // 寄信不在交易內做，呼叫端拿到名單後在交易外寄轉正通知信。
+  | { outcome: "updated"; event: Event; promoted: Registration[] }
   | { outcome: "not_found" }
   | { outcome: "capacity_below_confirmed"; confirmedCount: number }
 
@@ -63,7 +66,7 @@ export async function updateEventWithCapacityGuard(
       : data.requirePayment
     const amount = hasRegistrations ? event.amount : data.amountInCents
 
-    await tx.event.update({
+    const updated = await tx.event.update({
       where: { id: eventId },
       data: {
         title: data.title,
@@ -79,7 +82,13 @@ export async function updateEventWithCapacityGuard(
       },
     })
 
-    return { outcome: "updated" }
+    // 名額調高（或先前名額釋出而卡住的候補）在同一把行鎖交易內
+    // 依報名順序自動轉正——與報名成立同一套先到先得規則，
+    // 候補通知信也已向報名者承諾「有名額釋出將另行通知」。
+    // 名額沒有多出來時是 no-op。
+    const promoted = await promoteWaitlistedInTx(tx, updated)
+
+    return { outcome: "updated", event: updated, promoted }
   }, {
     // 與報名端同一把行鎖排隊，放寬逾時的理由見 src/lib/registration.ts
     maxWait: 10_000,

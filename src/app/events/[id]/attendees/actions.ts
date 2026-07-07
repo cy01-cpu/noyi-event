@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache"
 
 import { prisma } from "@/lib/prisma"
+import { sendPromotionEmails } from "@/lib/promotion"
+import {
+  cancelRegistrationAndPromote,
+  setRefundStatus,
+} from "@/lib/registration"
 
 type TogglePaymentResult =
   | { success: true }
@@ -32,5 +37,73 @@ export async function togglePaymentStatus(
     return { success: true }
   } catch {
     return { success: false, error: "更新繳費狀態時發生錯誤，請稍後再試" }
+  }
+}
+
+export type CancelRegistrationResult =
+  | { success: true; promotedCount: number }
+  | { success: false; error: string }
+
+// C1 取消報名（內部人員代操作）。取消＋候補自動遞補的行鎖交易
+// 抽在 src/lib/registration.ts 的 cancelRegistrationAndPromote
+// （與驗證腳本共用同一份邏輯）。
+// 此 action 與本頁其他 action 相同，掛在 /events 路徑下受 proxy
+// 通行碼保護，不另做驗證。
+export async function cancelRegistration(
+  registrationId: string
+): Promise<CancelRegistrationResult> {
+  try {
+    const result = await cancelRegistrationAndPromote(registrationId)
+
+    if (result.outcome === "not_found") {
+      return { success: false, error: "找不到這筆報名" }
+    }
+    if (result.outcome === "already_cancelled") {
+      return { success: false, error: "這筆報名已經是取消狀態" }
+    }
+    if (result.outcome === "checked_in") {
+      return { success: false, error: "已報到的報名無法取消" }
+    }
+
+    // 轉正狀態已在交易內定案，交易外寄通知信；失敗記入 email-failures
+    // 清單（/api/health 可視化），不影響取消結果。
+    if (result.promoted.length > 0) {
+      await sendPromotionEmails(result.promoted, result.event)
+    }
+
+    revalidatePath(`/events/${result.event.id}/attendees`)
+    revalidatePath(`/events/${result.event.id}/register`)
+    return { success: true, promotedCount: result.promoted.length }
+  } catch {
+    return { success: false, error: "取消報名時發生錯誤，請稍後再試" }
+  }
+}
+
+type ToggleRefundResult =
+  | { success: true }
+  | { success: false; error: string }
+
+// 退費標記：已繳費的報名被取消後追蹤退費進度。經手人與標記已繳費
+// 共用同一個「收費經手人/站別」輸入框的值（PaidOperatorProvider）。
+export async function toggleRefundStatus(
+  registrationId: string,
+  refunded: boolean,
+  operator?: string
+): Promise<ToggleRefundResult> {
+  try {
+    const refundedBy = operator?.trim().slice(0, 50) || null
+    const result = await setRefundStatus(registrationId, refunded, refundedBy)
+
+    if (result.outcome === "not_found") {
+      return { success: false, error: "找不到這筆報名" }
+    }
+    if (result.outcome === "not_paid") {
+      return { success: false, error: "這筆報名沒有繳費紀錄，無退費可標記" }
+    }
+
+    revalidatePath(`/events/${result.registration.eventId}/attendees`)
+    return { success: true }
+  } catch {
+    return { success: false, error: "更新退費狀態時發生錯誤，請稍後再試" }
   }
 }

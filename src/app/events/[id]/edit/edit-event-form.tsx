@@ -18,6 +18,7 @@ type EditEventFormProps = {
   defaultValues: EventEditValues
   hasRegistrations: boolean
   confirmedCount: number
+  waitlistedCount: number
 }
 
 export function EditEventForm({
@@ -25,6 +26,7 @@ export function EditEventForm({
   defaultValues,
   hasRegistrations,
   confirmedCount,
+  waitlistedCount,
 }: EditEventFormProps) {
   return (
     <div className="theme-orange flex-1 bg-background text-foreground">
@@ -56,6 +58,7 @@ export function EditEventForm({
             ]}
             lockPaymentFields={hasRegistrations}
             minCapacity={confirmedCount}
+            waitlistedCount={waitlistedCount}
             submitLabel="儲存變更"
             submittingLabel="儲存中…"
             onSubmit={(values) => updateEvent(eventId, values)}

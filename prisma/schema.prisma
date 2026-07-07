@@ -42,6 +42,12 @@ model Registration {
   // 繳費稽核軌跡：標記已繳費時由操作者自填站別/姓名（仿 CheckIn.gate 的
   // 自填模式，不另建 PaymentLog 表）。取消標記時一併清空。
   paidBy    String?
+  // 退費追蹤：已繳費的報名被取消後，錢是否已還回去。refunded 與 isPaid
+  // 互相獨立、不互相覆蓋——isPaid 維持 true 保留「當初確實繳過費」的
+  // 歷史紀錄，refunded=false 就是畫面上的「待退費」。經手人比照 paidBy。
+  refunded   Boolean            @default(false)
+  refundedAt DateTime?
+  refundedBy String?
   status    RegistrationStatus @default(PENDING)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

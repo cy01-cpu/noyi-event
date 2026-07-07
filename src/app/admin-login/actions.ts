@@ -1,36 +1,19 @@
 "use server"
 
-import { cookies, headers } from "next/headers"
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { Ratelimit } from "@upstash/ratelimit"
-import { Redis } from "@upstash/redis"
 
 import {
   ADMIN_SESSION_COOKIE,
   createSessionToken,
   passcodeMatches,
 } from "@/lib/admin-auth"
-
-// Vercel 是無伺服器架構，請求會分派到不同執行環境，記憶體內的計數器
-// 無法跨實例累加，因此嘗試次數統一記在 Upstash Redis。
-// 未設定 Upstash 環境變數時跳過頻率限制（方便本機開發），並在 log 提出警告。
-function getRateLimiter(): Ratelimit | null {
-  if (
-    !process.env.UPSTASH_REDIS_REST_URL ||
-    !process.env.UPSTASH_REDIS_REST_TOKEN
-  ) {
-    console.warn(
-      "UPSTASH_REDIS_REST_URL/TOKEN 未設定，通行碼輸入未啟用頻率限制"
-    )
-    return null
-  }
-  return new Ratelimit({
-    redis: Redis.fromEnv(),
-    // 同一來源 IP 每分鐘最多嘗試 5 次
-    limiter: Ratelimit.slidingWindow(5, "1 m"),
-    prefix: "noyi-event:admin-login",
-  })
-}
+import {
+  checkRateLimit,
+  createRateLimiter,
+  getClientIp,
+  hasUpstashEnv,
+} from "@/lib/rate-limit"
 
 export async function verifyPasscode(
   passcode: string,
@@ -41,15 +24,25 @@ export async function verifyPasscode(
     return { error: "系統尚未設定通行碼（ADMIN_PASSCODE），請聯絡系統管理者" }
   }
 
-  const limiter = getRateLimiter()
-  if (limiter) {
-    const headerStore = await headers()
-    const ip =
-      headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
-    const { success } = await limiter.limit(ip)
-    if (!success) {
-      return { error: "嘗試次數過多，請一分鐘後再試" }
-    }
+  // 通行碼是全站唯一的身分防線，正式環境若 Upstash 環境變數缺失，
+  // 等於暴力嘗試不受任何限制，因此直接拒絕登入（fail closed）。
+  // 本機開發環境維持放行，不強制架 Redis 才能登入。
+  if (process.env.NODE_ENV === "production" && !hasUpstashEnv()) {
+    console.error(
+      "UPSTASH_REDIS_REST_URL/TOKEN 未設定，正式環境拒絕通行碼登入（fail closed）"
+    )
+    return { error: "系統安全設定不完整，暫時無法登入，請聯絡系統管理者" }
+  }
+
+  const limiter = createRateLimiter(
+    "noyi-event:admin-login",
+    // 同一來源 IP 每分鐘最多嘗試 5 次
+    5,
+    "1 m"
+  )
+  const rateLimit = await checkRateLimit(limiter, await getClientIp())
+  if (rateLimit === "limited") {
+    return { error: "嘗試次數過多，請一分鐘後再試" }
   }
 
   if (!passcodeMatches(passcode, adminPasscode)) {

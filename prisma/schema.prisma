@@ -39,6 +39,9 @@ model Registration {
   token     String             @unique @default(cuid())
   isPaid    Boolean            @default(false)
   paidAt    DateTime?
+  // 繳費稽核軌跡：標記已繳費時由操作者自填站別/姓名（仿 CheckIn.gate 的
+  // 自填模式，不另建 PaymentLog 表）。取消標記時一併清空。
+  paidBy    String?
   status    RegistrationStatus @default(PENDING)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

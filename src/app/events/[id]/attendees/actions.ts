@@ -10,15 +10,21 @@ type TogglePaymentResult =
 
 export async function togglePaymentStatus(
   registrationId: string,
-  isPaid: boolean
+  isPaid: boolean,
+  // 繳費稽核軌跡：操作者自填的站別/姓名（仿報到的 gate 欄位模式，選填）
+  operator?: string
 ): Promise<TogglePaymentResult> {
   try {
+    const paidBy = operator?.trim().slice(0, 50) || null
+
     const registration = await prisma.registration.update({
       where: { id: registrationId },
       data: {
         isPaid,
-        // 標記已繳費時記錄當下時間，取消標記則清空（雙向可切換，點錯可復原）
+        // 標記已繳費時記錄當下時間與經手人，取消標記則一併清空
+        // （雙向可切換，點錯可復原）
         paidAt: isPaid ? new Date() : null,
+        paidBy: isPaid ? paidBy : null,
       },
     })
 

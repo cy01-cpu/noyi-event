@@ -4,6 +4,7 @@ import { format } from "date-fns"
 import { prisma } from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
 import { TogglePaidButton } from "./toggle-paid-button"
+import { PaidOperatorProvider } from "./paid-operator"
 import { Card, CardContent } from "@/components/ui/card"
 
 const registrationStatusLabel: Record<string, string> = {
@@ -61,24 +62,8 @@ export default async function AttendeesPage({
   ).length
   const paidCount = registrations.filter((r) => r.isPaid).length
 
-  return (
-    <div className="theme-forest flex-1 bg-background text-foreground">
-      <div className="mx-auto max-w-2xl px-4 py-8">
-        <Link
-          href="/events"
-          className="mb-4 inline-block text-base text-muted-foreground hover:underline"
-        >
-          ← 返回活動列表
-        </Link>
-
-        <h1 className="mb-1 text-2xl font-bold">{event.title}・報到名單</h1>
-        <p className="mb-6 text-base text-muted-foreground">
-          總報名人數 {registrations.length} ・ 已報到 {checkedInCount}
-          {event.requirePayment &&
-            ` ・ 已繳費 ${paidCount} / 應繳 ${confirmedCount}`}
-        </p>
-
-        {sorted.length === 0 ? (
+  const attendeeList =
+    sorted.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-base text-muted-foreground">
               目前還沒有人報名
@@ -132,7 +117,11 @@ export default async function AttendeesPage({
                         }
                       >
                         {r.isPaid
-                          ? `已繳費${r.paidAt ? `（${format(r.paidAt, "MM/dd")}）` : ""}`
+                          ? `已繳費${
+                              r.paidAt
+                                ? `（${format(r.paidAt, "MM/dd")}${r.paidBy ? `・${r.paidBy}` : ""}）`
+                                : ""
+                            }`
                           : "未繳費"}
                       </Badge>
                       <TogglePaidButton registrationId={r.id} isPaid={r.isPaid} />
@@ -142,6 +131,32 @@ export default async function AttendeesPage({
               </Card>
             ))}
           </div>
+        )
+
+  return (
+    <div className="theme-forest flex-1 bg-background text-foreground">
+      <div className="mx-auto max-w-2xl px-4 py-8">
+        <Link
+          href="/events"
+          className="mb-4 inline-block text-base text-muted-foreground hover:underline"
+        >
+          ← 返回活動列表
+        </Link>
+
+        <h1 className="mb-1 text-2xl font-bold">{event.title}・報到名單</h1>
+        <p className="mb-6 text-base text-muted-foreground">
+          總報名人數 {registrations.length} ・ 已報到 {checkedInCount}
+          {event.requirePayment &&
+            ` ・ 已繳費 ${paidCount} / 應繳 ${confirmedCount}`}
+        </p>
+
+        {/* 需要收費的活動才顯示「收費經手人」欄位（B1 繳費稽核軌跡）；
+            名單卡片作為 children 傳入，卡片內的 TogglePaidButton 透過
+            Context 取得目前填寫的經手人 */}
+        {event.requirePayment ? (
+          <PaidOperatorProvider>{attendeeList}</PaidOperatorProvider>
+        ) : (
+          attendeeList
         )}
       </div>
     </div>

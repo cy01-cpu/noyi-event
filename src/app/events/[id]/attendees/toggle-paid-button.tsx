@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 
 import { togglePaymentStatus } from "./actions"
+import { usePaidOperator } from "./paid-operator"
 import { Button } from "@/components/ui/button"
 
 export function TogglePaidButton({
@@ -14,11 +15,17 @@ export function TogglePaidButton({
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const operator = usePaidOperator()
 
   function handleClick() {
     setError(null)
     startTransition(async () => {
-      const result = await togglePaymentStatus(registrationId, !isPaid)
+      const result = await togglePaymentStatus(
+        registrationId,
+        !isPaid,
+        // 經手人只在「標記已繳費」時有意義，取消標記由後端一併清空
+        operator || undefined
+      )
       if (!result.success) {
         setError(result.error)
       }

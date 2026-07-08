@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache"
 
 import { prisma } from "@/lib/prisma"
 import { eventFormSchema, type EventEditValues } from "@/lib/validations/event"
+import {
+  eventFormFieldsSchema,
+  type EventFormFieldValues,
+} from "@/lib/validations/event-form-field"
 
 type CreateEventResult =
   | { success: true }
@@ -13,14 +17,21 @@ type CreateEventResult =
 // 參數型別用共用表單元件的 EventEditValues（狀態範圍較寬），
 // 但驗證仍用建立專用的 eventFormSchema：新活動狀態只允許 DRAFT/OPEN。
 export async function createEvent(
-  values: EventEditValues
+  values: EventEditValues,
+  formFields: EventFormFieldValues[]
 ): Promise<CreateEventResult> {
   const parsed = eventFormSchema.safeParse(values)
+  const parsedFields = eventFormFieldsSchema.safeParse(formFields)
 
-  if (!parsed.success) {
+  if (!parsed.success || !parsedFields.success) {
     return {
       success: false,
-      errors: parsed.error.flatten().fieldErrors,
+      errors: {
+        ...(parsed.success ? {} : parsed.error.flatten().fieldErrors),
+        ...(parsedFields.success
+          ? {}
+          : { _form: ["自訂報名欄位資料有誤，請確認後再試一次"] }),
+      },
     }
   }
 
@@ -33,6 +44,9 @@ export async function createEvent(
       : null
 
   try {
+    // 新活動沒有既有報名可言，不需要行鎖／hasRegistrations 判斷，
+    // Prisma 巢狀寫入即可原子完成（比照 src/lib/events.ts 的鎖定規則，
+    // 這裡永遠等同「還沒有任何報名」那個分支）。
     await prisma.event.create({
       data: {
         title: data.title,
@@ -45,6 +59,17 @@ export async function createEvent(
         requirePayment: data.requirePayment,
         amount: amountInCents,
         status: data.status,
+        formFields: {
+          createMany: {
+            data: parsedFields.data.map((f, i) => ({
+              label: f.label,
+              type: f.type,
+              required: f.required,
+              options: f.options,
+              order: i,
+            })),
+          },
+        },
       },
     })
   } catch {

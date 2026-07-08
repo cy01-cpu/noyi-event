@@ -46,16 +46,18 @@ export default async function RegisterPage({
     )
   }
 
-  const remainingSlots =
-    event.capacity !== null
-      ? Math.max(
-          event.capacity -
-            (await prisma.registration.count({
-              where: { eventId: event.id, status: "CONFIRMED" },
-            })),
-          0
-        )
-      : null
+  const capacity = event.capacity
+  const [remainingSlots, formFields] = await Promise.all([
+    capacity !== null
+      ? prisma.registration
+          .count({ where: { eventId: event.id, status: "CONFIRMED" } })
+          .then((confirmedCount) => Math.max(capacity - confirmedCount, 0))
+      : Promise.resolve(null),
+    prisma.eventFormField.findMany({
+      where: { eventId: event.id },
+      orderBy: { order: "asc" },
+    }),
+  ])
 
   return (
     <div className="theme-orange flex-1 bg-background text-foreground">
@@ -99,7 +101,16 @@ export default async function RegisterPage({
           </div>
         )}
 
-        <RegistrationForm eventId={event.id} />
+        <RegistrationForm
+          eventId={event.id}
+          formFields={formFields.map((f) => ({
+            id: f.id,
+            label: f.label,
+            type: f.type,
+            required: f.required,
+            options: f.options,
+          }))}
+        />
       </div>
     </div>
   )

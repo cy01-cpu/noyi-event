@@ -15,6 +15,7 @@ import {
   registrationFormSchema,
   type RegistrationFormValues,
 } from "@/lib/validations/registration"
+import type { CustomFieldValues } from "@/lib/validations/event-form-field"
 import { sendRegistrationConfirmation } from "@/lib/email/registration-confirmation"
 
 type CreateRegistrationResult =
@@ -23,7 +24,8 @@ type CreateRegistrationResult =
 
 export async function createRegistration(
   eventId: string,
-  values: RegistrationFormValues
+  values: RegistrationFormValues,
+  customFieldValues: CustomFieldValues = {}
 ): Promise<CreateRegistrationResult> {
   // 公開表單的機器人防線採 IP 限流而非 CAPTCHA（與長輩友善的設計原則衝突）。
   // 額度放在「真人不會踩到、腳本灌水會被擋」的量級。與登入不同，這裡
@@ -78,6 +80,7 @@ export async function createRegistration(
       phone: data.phone || null,
       branch: data.branch ?? null,
       note: data.note || null,
+      customFieldValues,
     })
 
     if (result.outcome === "not_found") {
@@ -89,6 +92,14 @@ export async function createRegistration(
     }
     if (result.outcome === "ended") {
       return { success: false, error: "此活動已結束，無法報名" }
+    }
+    if (result.outcome === "invalid_custom_fields") {
+      // 承辦人剛好在使用者填表過程中改動了欄位定義，client 端送出的
+      // 是瞬間過期的 schema——請使用者重新整理頁面拿最新題目再送一次
+      return {
+        success: false,
+        error: "表單題目剛好被更新，請重新整理頁面後再填寫一次",
+      }
     }
 
     const registration = result.registration

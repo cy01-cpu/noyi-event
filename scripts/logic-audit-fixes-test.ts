@@ -105,6 +105,7 @@ async function main() {
       requirePayment: currentEvent.requirePayment,
       amountInCents: currentEvent.amount,
       status: currentEvent.status,
+      formFields: [],
     }
     const editResult = await updateEventWithCapacityGuard(event.id, editData)
     assert(

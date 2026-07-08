@@ -8,7 +8,7 @@ export default async function EditEventPage({
 }) {
   const { id } = await params
 
-  const [event, registrationCount, confirmedCount, waitlistedCount] =
+  const [event, registrationCount, confirmedCount, waitlistedCount, formFields] =
     await Promise.all([
       prisma.event.findUnique({ where: { id } }),
       prisma.registration.count({ where: { eventId: id } }),
@@ -17,6 +17,10 @@ export default async function EditEventPage({
       }),
       prisma.registration.count({
         where: { eventId: id, status: "WAITLISTED" },
+      }),
+      prisma.eventFormField.findMany({
+        where: { eventId: id },
+        orderBy: { order: "asc" },
       }),
     ])
 
@@ -49,6 +53,13 @@ export default async function EditEventPage({
       hasRegistrations={registrationCount > 0}
       confirmedCount={confirmedCount}
       waitlistedCount={waitlistedCount}
+      existingFormFields={formFields.map((f) => ({
+        id: f.id,
+        label: f.label,
+        type: f.type,
+        required: f.required,
+        options: f.options,
+      }))}
     />
 
   )

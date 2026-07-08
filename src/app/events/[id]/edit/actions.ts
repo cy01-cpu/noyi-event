@@ -6,6 +6,10 @@ import { revalidatePath } from "next/cache"
 import { updateEventWithCapacityGuard } from "@/lib/events"
 import { sendPromotionEmails } from "@/lib/promotion"
 import { eventEditSchema, type EventEditValues } from "@/lib/validations/event"
+import {
+  eventFormFieldsSchema,
+  type EventFormFieldValues,
+} from "@/lib/validations/event-form-field"
 
 type UpdateEventResult =
   | { success: true }
@@ -13,14 +17,21 @@ type UpdateEventResult =
 
 export async function updateEvent(
   eventId: string,
-  values: EventEditValues
+  values: EventEditValues,
+  formFields: EventFormFieldValues[]
 ): Promise<UpdateEventResult> {
   const parsed = eventEditSchema.safeParse(values)
+  const parsedFields = eventFormFieldsSchema.safeParse(formFields)
 
-  if (!parsed.success) {
+  if (!parsed.success || !parsedFields.success) {
     return {
       success: false,
-      errors: parsed.error.flatten().fieldErrors,
+      errors: {
+        ...(parsed.success ? {} : parsed.error.flatten().fieldErrors),
+        ...(parsedFields.success
+          ? {}
+          : { _form: ["自訂報名欄位資料有誤，請確認後再試一次"] }),
+      },
     }
   }
 
@@ -44,6 +55,7 @@ export async function updateEvent(
           ? Math.round(data.amount * 100) // 元 → 分，避免浮點誤差
           : null,
       status: data.status,
+      formFields: parsedFields.data,
     })
   } catch {
     return {

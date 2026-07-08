@@ -31,6 +31,10 @@ export default async function AttendeesPage({
 }) {
   const { id } = await params
   const event = await prisma.event.findUnique({ where: { id } })
+  const formFields = await prisma.eventFormField.findMany({
+    where: { eventId: id },
+    orderBy: { order: "asc" },
+  })
 
   if (!event) {
     return (
@@ -115,6 +119,31 @@ export default async function AttendeesPage({
                   <p className="break-all text-base text-muted-foreground">
                     {r.email}
                   </p>
+
+                  {/* 自訂報名欄位答案：選填欄位沒填就整行不顯示，避免
+                      每張卡片都印一堆「未填」造成雜訊（見 event-form-field.ts） */}
+                  {formFields.length > 0 && (
+                    <div className="space-y-0.5">
+                      {formFields.map((f) => {
+                        const answers = (r.customFields ?? {}) as Record<
+                          string,
+                          string | boolean
+                        >
+                        const value = answers[f.id]
+                        if (value === undefined) return null
+                        const display =
+                          f.type === "CHECKBOX" ? (value ? "是" : "否") : value
+                        return (
+                          <p key={f.id} className="text-base">
+                            <span className="text-muted-foreground">
+                              {f.label}：
+                            </span>
+                            {display}
+                          </p>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap items-center gap-2">
                     {r.checkIn ? (

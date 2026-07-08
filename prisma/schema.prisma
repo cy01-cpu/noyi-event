@@ -21,6 +21,31 @@ model Event {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   registrations Registration[]
+  formFields    EventFormField[]
+}
+
+// 自訂報名表單欄位（承辦人針對個別活動加的額外題目）。已有報名後，
+// 既有欄位的內容與順序凍結（見 src/lib/events.ts applyFormFieldChanges），
+// 只能繼續新增欄位，不能竄改/刪除已存在的欄位——避免舊報名者的答案
+// 對不上題目。
+model EventFormField {
+  id        String        @id @default(cuid())
+  eventId   String
+  event     Event         @relation(fields: [eventId], references: [id])
+  label     String
+  type      FormFieldType
+  required  Boolean       @default(false)
+  options   String[]      @default([])
+  order     Int
+  createdAt DateTime      @default(now())
+
+  @@index([eventId])
+}
+
+enum FormFieldType {
+  TEXT
+  SELECT
+  CHECKBOX
 }
 
 // TODO: 疑似重複提醒邏輯（後台顯示用，不阻擋報名送出）
@@ -48,6 +73,10 @@ model Registration {
   refunded   Boolean            @default(false)
   refundedAt DateTime?
   refundedBy String?
+  // 自訂欄位答案：{ [EventFormField.id]: string | boolean }。沒有自訂
+  // 欄位或選填欄位使用者略過時，整個 key 省略，不寫 null（避免 Prisma
+  // JsonNull/DbNull 的寫入毛邊，見 src/lib/registration.ts）。
+  customFields Json?
   status    RegistrationStatus @default(PENDING)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

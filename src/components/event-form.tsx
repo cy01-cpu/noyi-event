@@ -1,15 +1,24 @@
 "use client"
 
 import { useState } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 
 import { eventEditSchema, type EventEditValues } from "@/lib/validations/event"
+import {
+  eventFormFieldsSchema,
+  formFieldTypeValues,
+  formFieldTypeLabel,
+  type EventFormFieldValues,
+} from "@/lib/validations/event-form-field"
 import { DateTimePicker } from "@/components/date-time-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -31,19 +40,30 @@ export type EventFormResult =
   | { success: true }
   | { success: false; errors: Record<string, string[] | undefined> }
 
+const formFieldsFormSchema = z.object({ formFields: eventFormFieldsSchema })
+type FormFieldsFormValues = z.infer<typeof formFieldsFormSchema>
+
 type EventFormProps = {
   defaultValues: EventEditValues
   // 建立頁只提供草稿/開放報名，編輯頁提供全部四種狀態
   statusOptions: { value: EventEditValues["status"]; label: string }[]
   // 已有報名時鎖定繳費相關欄位（後端 Server Action 另有防呆，這裡是 UX 層）
   lockPaymentFields?: boolean
+  // 已有任何報名時，自訂欄位裡「已存在」的題目凍結不可改/刪，
+  // 但仍可以繼續新增新題目（後端 applyFormFieldChanges 另有硬性防呆）
+  hasRegistrations?: boolean
+  // 目前已存在的自訂欄位（帶真實 id），新增頁固定是空陣列
+  existingFormFields?: EventFormFieldValues[]
   // 已有 CONFIRMED 報名時的名額下限（前端提示用，後端另做硬性驗證）
   minCapacity?: number
   // 目前候補中的人數（C1 遞補預警用；儲存時後端會在同一交易內自動轉正）
   waitlistedCount?: number
   submitLabel: string
   submittingLabel: string
-  onSubmit: (values: EventEditValues) => Promise<EventFormResult>
+  onSubmit: (
+    values: EventEditValues,
+    formFields: EventFormFieldValues[]
+  ) => Promise<EventFormResult>
 }
 
 // 前端一律用 eventEditSchema（完整狀態範圍）做即時驗證：建立頁的
@@ -53,6 +73,8 @@ export function EventForm({
   defaultValues,
   statusOptions,
   lockPaymentFields = false,
+  hasRegistrations = false,
+  existingFormFields = [],
   minCapacity,
   waitlistedCount = 0,
   submitLabel,
@@ -65,6 +87,28 @@ export function EventForm({
     resolver: zodResolver(eventEditSchema),
     defaultValues,
   })
+
+  // 自訂報名欄位獨立成第二個 form：eventEditSchema 已經 .refine 過，
+  // Zod 4 不允許再 .extend 塞進 formFields，且欄位陣列本來就不屬於
+  // EventEditValues。送出時兩個 form 各自驗證，一起組進 onSubmit。
+  const fieldsForm = useForm<FormFieldsFormValues>({
+    resolver: zodResolver(formFieldsFormSchema),
+    defaultValues: { formFields: existingFormFields },
+  })
+  // keyName 改叫 fieldKey，避免跟欄位定義本身的 id（資料庫真實 id，
+  // 用來判斷是否已鎖定）撞名——RHF 預設會把它的內部 key 也叫 id。
+  const {
+    fields: fieldRows,
+    append,
+    remove,
+    move,
+  } = useFieldArray({ control: fieldsForm.control, name: "formFields", keyName: "fieldKey" })
+
+  // 已鎖定的欄位 id 只在掛載當下算一次：判斷「這個欄位是已有報名前就
+  // 存在的舊欄位」，跟使用者這次編輯階段新增的欄位分開處理
+  const [lockedFieldIds] = useState<Set<string>>(
+    () => new Set(hasRegistrations ? existingFormFields.map((f) => f.id).filter((id): id is string => !!id) : [])
+  )
 
   const requirePayment = form.watch("requirePayment")
 
@@ -87,7 +131,11 @@ export function EventForm({
 
   async function handleSubmit(values: EventEditValues) {
     setFormError(null)
-    const result = await onSubmit(values)
+
+    const fieldsValid = await fieldsForm.trigger()
+    if (!fieldsValid) return
+
+    const result = await onSubmit(values, fieldsForm.getValues().formFields)
 
     if (!result.success) {
       for (const [field, messages] of Object.entries(result.errors)) {
@@ -305,6 +353,209 @@ export function EventForm({
             )}
           />
         )}
+
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-0.5">
+            <p className="text-base font-medium">自訂報名欄位（選填）</p>
+            <p className="text-sm text-muted-foreground">
+              除了姓名/Email/電話等固定欄位，可以在這裡加問題（例如葷素、同行人數）。
+              {hasRegistrations &&
+                "已有人報名，既有題目無法修改，但仍可以繼續新增新題目。"}
+            </p>
+          </div>
+
+          <Form {...fieldsForm}>
+            <div className="space-y-3">
+              {fieldRows.map((row, index) => {
+                const locked = !!row.id && lockedFieldIds.has(row.id)
+                const type = fieldsForm.watch(`formFields.${index}.type`)
+
+                if (locked) {
+                  return (
+                    <div
+                      key={row.fieldKey}
+                      data-testid="form-field-row-locked"
+                      className="rounded-lg bg-muted p-3 text-base"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{row.label}</span>
+                        <Badge className="bg-background text-muted-foreground">
+                          {formFieldTypeLabel[row.type]}
+                        </Badge>
+                        {row.required && (
+                          <Badge className="bg-amber-100 text-amber-800">
+                            必填
+                          </Badge>
+                        )}
+                      </div>
+                      {row.type === "SELECT" && row.options.length > 0 && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          選項：{row.options.join("、")}
+                        </p>
+                      )}
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        已有人報名，這題無法修改
+                      </p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div
+                    key={row.fieldKey}
+                    data-testid="form-field-row"
+                    className="space-y-3 rounded-lg border p-3"
+                  >
+                    <FormField
+                      control={fieldsForm.control}
+                      name={`formFields.${index}.label`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>題目文字</FormLabel>
+                          <FormControl>
+                            <Input placeholder="例如：葷素" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <FormField
+                        control={fieldsForm.control}
+                        name={`formFields.${index}.type`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>類型</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={(value) => {
+                                field.onChange(value)
+                                // 核取方塊結構性地不允許必填（無法表達
+                                // 「否」，見 event-form-field.ts）
+                                if (value === "CHECKBOX") {
+                                  fieldsForm.setValue(
+                                    `formFields.${index}.required`,
+                                    false
+                                  )
+                                }
+                              }}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {formFieldTypeValues.map((value) => (
+                                  <SelectItem key={value} value={value}>
+                                    {formFieldTypeLabel[value]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {type !== "CHECKBOX" && (
+                        <FormField
+                          control={fieldsForm.control}
+                          name={`formFields.${index}.required`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <FormLabel>必填</FormLabel>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+
+                    {type === "SELECT" && (
+                      <FormField
+                        control={fieldsForm.control}
+                        name={`formFields.${index}.options`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>選項（用逗號分隔，至少 2 個）</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="例如：葷食, 素食"
+                                defaultValue={field.value?.join(", ") ?? ""}
+                                onBlur={(e) =>
+                                  field.onChange(
+                                    e.target.value
+                                      .split(",")
+                                      .map((s) => s.trim())
+                                      .filter(Boolean)
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    <div className="flex items-center justify-end gap-2">
+                      {!hasRegistrations && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === 0}
+                            onClick={() => move(index, index - 1)}
+                          >
+                            <ArrowUp className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === fieldRows.length - 1}
+                            onClick={() => move(index, index + 1)}
+                          >
+                            <ArrowDown className="size-4" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {fieldRows.length < 10 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() =>
+                  append({ label: "", type: "TEXT", required: false, options: [] })
+                }
+              >
+                <Plus className="size-4" /> 新增題目
+              </Button>
+            )}
+          </Form>
+        </div>
 
         <FormField
           control={form.control}

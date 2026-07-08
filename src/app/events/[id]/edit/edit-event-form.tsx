@@ -5,6 +5,7 @@ import Link from "next/link"
 import { updateEvent } from "./actions"
 import { EventForm } from "@/components/event-form"
 import type { EventEditValues } from "@/lib/validations/event"
+import type { EventFormFieldValues } from "@/lib/validations/event-form-field"
 import {
   Card,
   CardContent,
@@ -19,6 +20,7 @@ type EditEventFormProps = {
   hasRegistrations: boolean
   confirmedCount: number
   waitlistedCount: number
+  existingFormFields: EventFormFieldValues[]
 }
 
 export function EditEventForm({
@@ -27,6 +29,7 @@ export function EditEventForm({
   hasRegistrations,
   confirmedCount,
   waitlistedCount,
+  existingFormFields,
 }: EditEventFormProps) {
   return (
     <div className="theme-orange flex-1 bg-background text-foreground">
@@ -57,11 +60,15 @@ export function EditEventForm({
               { value: "CANCELLED", label: "已取消" },
             ]}
             lockPaymentFields={hasRegistrations}
+            hasRegistrations={hasRegistrations}
+            existingFormFields={existingFormFields}
             minCapacity={confirmedCount}
             waitlistedCount={waitlistedCount}
             submitLabel="儲存變更"
             submittingLabel="儲存中…"
-            onSubmit={(values) => updateEvent(eventId, values)}
+            onSubmit={(values, formFields) =>
+              updateEvent(eventId, values, formFields)
+            }
           />
         </CardContent>
       </Card>

@@ -3,17 +3,23 @@
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
 import { createRegistration } from "@/app/events/[id]/register/actions"
 import {
   registrationFormSchema,
   branchGroups,
   otherBranchOption,
-  type RegistrationFormValues,
 } from "@/lib/validations/registration"
+import {
+  buildCustomFieldsSchema,
+  type CustomFieldDefinition,
+  type CustomFieldValues,
+} from "@/lib/validations/event-form-field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -39,24 +45,49 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
-export function RegistrationForm({ eventId }: { eventId: string }) {
+export function RegistrationForm({
+  eventId,
+  formFields,
+}: {
+  eventId: string
+  formFields: CustomFieldDefinition[]
+}) {
   const [formError, setFormError] = useState<string | null>(null)
   const [result, setResult] = useState<"CONFIRMED" | "WAITLISTED" | null>(null)
 
-  const form = useForm<RegistrationFormValues>({
-    resolver: zodResolver(registrationFormSchema),
+  // registrationFormSchema 沒有 object-level .refine（只有 phone 欄位級
+  // 的 .refine），可以直接合併成單一動態 schema，不用像後台編輯活動
+  // 那樣拆成兩個 form（見 src/components/event-form.tsx 的註解）。
+  const combinedSchema = z.object({
+    ...registrationFormSchema.shape,
+    customFields: buildCustomFieldsSchema(formFields),
+  })
+  type CombinedValues = z.infer<typeof combinedSchema>
+
+  const form = useForm<CombinedValues>({
+    resolver: zodResolver(combinedSchema),
     defaultValues: {
       name: "",
       email: "",
       phone: "",
       branch: undefined,
       note: "",
+      customFields: {},
     },
   })
 
-  async function onSubmit(values: RegistrationFormValues) {
+  async function onSubmit(values: CombinedValues) {
     setFormError(null)
-    const res = await createRegistration(eventId, values)
+    const { customFields, ...registrationValues } = values
+    // customFields 的型別來自動態組出的 z.object(shape)，TS 只能推得
+    // Record<string, unknown>；實際形狀由 buildCustomFieldsSchema 保證，
+    // 送到 Server Action 後也會依同一份 schema 重新驗證一次，不是信任
+    // 這個 cast 本身。
+    const res = await createRegistration(
+      eventId,
+      registrationValues,
+      customFields as CustomFieldValues
+    )
 
     if (!res.success) {
       setFormError(res.error)
@@ -189,6 +220,75 @@ export function RegistrationForm({ eventId }: { eventId: string }) {
                 </FormItem>
               )}
             />
+
+            {formFields.map((customField) => (
+              <FormField
+                key={customField.id}
+                control={form.control}
+                name={`customFields.${customField.id}` as const}
+                render={({ field }) => (
+                  <FormItem
+                    className={
+                      customField.type === "CHECKBOX"
+                        ? "flex flex-row items-center gap-2.5 space-y-0"
+                        : undefined
+                    }
+                  >
+                    {customField.type === "CHECKBOX" ? (
+                      <>
+                        <FormControl>
+                          <Checkbox
+                            checked={Boolean(field.value)}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {customField.label}
+                        </FormLabel>
+                      </>
+                    ) : customField.type === "SELECT" ? (
+                      <>
+                        <FormLabel>
+                          {customField.label}
+                          {customField.required && "（必填）"}
+                        </FormLabel>
+                        <Select
+                          value={typeof field.value === "string" ? field.value : undefined}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={`請選擇：${customField.label}`} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customField.options.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      <>
+                        <FormLabel>
+                          {customField.label}
+                          {customField.required && "（必填）"}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            value={typeof field.value === "string" ? field.value : ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                      </>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ))}
 
             <Button
               type="submit"

@@ -1,8 +1,13 @@
-import type { Event, Registration } from "@prisma/client"
+import type { Event, Prisma, Registration } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { isRegistrationClosed } from "@/lib/event-time"
 import { promoteWaitlistedInTx } from "@/lib/promotion"
+import {
+  buildCustomFieldsSchema,
+  type CustomFieldDefinition,
+  type CustomFieldValues,
+} from "@/lib/validations/event-form-field"
 
 type NewRegistrationData = {
   name: string
@@ -10,6 +15,8 @@ type NewRegistrationData = {
   phone: string | null
   branch: string | null
   note: string | null
+  // 選填：沒有自訂欄位的活動（或既有呼叫端如併發測試腳本）不必帶
+  customFieldValues?: CustomFieldValues
 }
 
 export type CapacityCheckedInsertResult =
@@ -18,6 +25,9 @@ export type CapacityCheckedInsertResult =
   | { outcome: "not_open" }
   // 活動時間上已結束（報名開放到活動結束為止，見 src/lib/event-time.ts）
   | { outcome: "ended" }
+  // 自訂欄位答案未通過驗證：多半是承辦人在使用者填表過程中剛好改動
+  // 了欄位定義，client 端送出的是瞬間過期的 schema（見下方鎖內重讀）
+  | { outcome: "invalid_custom_fields" }
 
 // 把「名額判斷 + 寫入報名」抽成獨立函式的原因：
 // 1. Server Action（actions.ts）與併發測試腳本（scripts/concurrency-test.ts）
@@ -68,6 +78,32 @@ export async function insertRegistrationWithCapacityCheck(
       return { outcome: "ended" }
     }
 
+    // 自訂欄位答案：鎖內重讀當下的欄位定義再驗證（不信任 client 送上來
+    // 的 schema），避免承辦人剛好在使用者填表途中改動欄位定義造成的
+    // 競態——與 capacity/status/時間邊界「鎖內重讀最新值再判斷」同一套原則。
+    const formFields = await tx.eventFormField.findMany({ where: { eventId } })
+    const fieldDefs: CustomFieldDefinition[] = formFields.map((f) => ({
+      id: f.id,
+      label: f.label,
+      type: f.type,
+      required: f.required,
+      options: f.options,
+    }))
+    const parsedCustomFields = buildCustomFieldsSchema(fieldDefs).safeParse(
+      data.customFieldValues ?? {}
+    )
+    if (!parsedCustomFields.success) {
+      return { outcome: "invalid_custom_fields" }
+    }
+    // 選填欄位沒填時值是 undefined，省略該 key（而非寫 undefined/null），
+    // 避免每筆報名都存一堆沒意義的空答案。parsedCustomFields.data 的型別
+    // 來自動態組出的 z.object(shape)，TS 只能推得 Record<string, unknown>，
+    // 但值的實際形狀（string | boolean）已經被 buildCustomFieldsSchema
+    // 驗證保證，這裡轉成 Prisma 的 Json 輸入型別是安全的。
+    const customFields = Object.fromEntries(
+      Object.entries(parsedCustomFields.data).filter(([, v]) => v !== undefined)
+    ) as Prisma.InputJsonValue
+
     let status: "CONFIRMED" | "WAITLISTED" = "CONFIRMED"
 
     if (capacity !== null) {
@@ -88,6 +124,7 @@ export async function insertRegistrationWithCapacityCheck(
         branch: data.branch,
         note: data.note,
         status,
+        ...(Object.keys(customFields).length > 0 ? { customFields } : {}),
       },
     })
 

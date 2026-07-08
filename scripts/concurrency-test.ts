@@ -70,6 +70,7 @@ function editDataFrom(
     requirePayment: event.requirePayment,
     amountInCents: event.amount,
     status: event.status,
+    formFields: [],
     ...overrides,
   }
 }

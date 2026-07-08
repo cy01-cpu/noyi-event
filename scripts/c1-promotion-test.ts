@@ -53,6 +53,7 @@ function editData(
     requirePayment: event.requirePayment,
     amountInCents: event.amount,
     status: event.status as GuardedEventUpdateData["status"],
+    formFields: [],
     ...overrides,
   }
 }

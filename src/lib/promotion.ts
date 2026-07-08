@@ -2,6 +2,7 @@ import type { Event, Prisma, Registration } from "@prisma/client"
 
 import { recordEmailFailure } from "@/lib/email-failures"
 import { sendRegistrationConfirmation } from "@/lib/email/registration-confirmation"
+import { isRegistrationClosed } from "@/lib/event-time"
 
 // C1 候補自動轉正的共用核心。呼叫端（活動編輯 src/lib/events.ts、
 // 取消報名 attendees/actions.ts、人工工具 scripts/promote-waitlisted.ts）
@@ -13,12 +14,21 @@ import { sendRegistrationConfirmation } from "@/lib/email/registration-confirmat
 // 寄信）；dryRun 時只計算名單不寫入，供人工工具預演。
 export async function promoteWaitlistedInTx(
   tx: Prisma.TransactionClient,
-  event: Pick<Event, "id" | "capacity" | "status">,
+  event: Pick<Event, "id" | "capacity" | "status" | "startAt" | "endAt">,
   options: { dryRun?: boolean } = {}
 ): Promise<Registration[]> {
   // 已取消的活動不遞補（轉正信等於通知參加一場不存在的活動）；
   // 草稿同理——回到 OPEN/CLOSED 的那次儲存會再走到這裡補做遞補。
   if (event.status === "CANCELLED" || event.status === "DRAFT") {
+    return []
+  }
+
+  // 活動已結束（報名窗已關，見 src/lib/event-time.ts）不再自動轉正：
+  // 轉正信會寄出含 QR Code 的「報名成功」通知，對一場已結束、報到窗
+  // 也已關閉的活動毫無意義，還會誤導候補者以為能報到。取消已確認的
+  // 報名（含事後補登記錄）、調高名額都會走到這裡，時間邊界必須擋在
+  // 共用函式內，不能只靠呼叫端各自記得檢查。
+  if (isRegistrationClosed(event)) {
     return []
   }
 

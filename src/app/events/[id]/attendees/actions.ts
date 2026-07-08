@@ -20,6 +20,24 @@ export async function togglePaymentStatus(
   operator?: string
 ): Promise<TogglePaymentResult> {
   try {
+    // 已取消的報名一律改走退費標記（ToggleRefundedButton），這裡是
+    // 後端防呆：畫面上 TogglePaidButton 只在未取消時渲染，但若使用者
+    // 分頁停在取消前的舊畫面、其他人先把這筆取消並標記退費，這裡沒擋
+    // 就會把 isPaid 改掉，讓 refunded 變成孤兒紀錄（已退費卻查無繳費）。
+    const current = await prisma.registration.findUnique({
+      where: { id: registrationId },
+      select: { status: true },
+    })
+    if (!current) {
+      return { success: false, error: "找不到這筆報名" }
+    }
+    if (current.status === "CANCELLED") {
+      return {
+        success: false,
+        error: "這筆報名已取消，繳費狀態請改用退費標記操作",
+      }
+    }
+
     const paidBy = operator?.trim().slice(0, 50) || null
 
     const registration = await prisma.registration.update({

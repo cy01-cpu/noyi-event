@@ -13,6 +13,22 @@
 - **部署**：Vercel
 - **版本控制**：GitHub
 - **快取／佇列**：Upstash（備用）
+- **E2E／真點擊測試**：Playwright（`devDependencies`）——用來驗證「點按鈕
+  觸發 Server Action」這類流程（報到、繳費標記、取消報名等），比只看
+  GET 頁面文字更可靠。範例：`scripts/real-click-checkin-test.ts`
+
+---
+
+## 新電腦設定專案時的額外安裝步驟
+
+除了 `npm install`，**Playwright 還需要另外下載瀏覽器執行檔**，否則
+執行 `scripts/real-click-*.ts` 這類測試會出現「找不到瀏覽器」的錯誤：
+
+```bash
+npx playwright install chromium
+```
+
+只需執行一次（瀏覽器裝在使用者層級的快取目錄，不隨專案資料夾走）。
 
 ---
 

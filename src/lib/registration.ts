@@ -1,6 +1,7 @@
 import type { Event, Registration } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { isRegistrationClosed } from "@/lib/event-time"
 import { promoteWaitlistedInTx } from "@/lib/promotion"
 
 type NewRegistrationData = {
@@ -15,6 +16,8 @@ export type CapacityCheckedInsertResult =
   | { outcome: "created"; registration: Registration }
   | { outcome: "not_found" }
   | { outcome: "not_open" }
+  // 活動時間上已結束（報名開放到活動結束為止，見 src/lib/event-time.ts）
+  | { outcome: "ended" }
 
 // 把「名額判斷 + 寫入報名」抽成獨立函式的原因：
 // 1. Server Action（actions.ts）與併發測試腳本（scripts/concurrency-test.ts）
@@ -39,17 +42,30 @@ export async function insertRegistrationWithCapacityCheck(
     // 即使 capacity 目前是 null（不限名額）也一律上鎖：編輯端可能正在
     // 「從不限名額改成有名額上限」，若此時報名不上鎖，重讀就失去意義。
     const rows = await tx.$queryRaw<
-      { id: string; capacity: number | null; status: string }[]
-    >`SELECT id, capacity, status FROM "Event" WHERE id = ${eventId} FOR UPDATE`
+      {
+        id: string
+        capacity: number | null
+        status: string
+        startAt: Date
+        endAt: Date | null
+      }[]
+    >`SELECT id, capacity, status, "startAt", "endAt" FROM "Event" WHERE id = ${eventId} FOR UPDATE`
 
     if (rows.length === 0) {
       return { outcome: "not_found" }
     }
 
-    const { capacity, status: eventStatus } = rows[0]
+    const { capacity, status: eventStatus, startAt, endAt } = rows[0]
 
     if (eventStatus !== "OPEN") {
       return { outcome: "not_open" }
+    }
+
+    // 時間邊界：活動結束後即使承辦人忘了把狀態改成「已截止」，
+    // 報名連結也不能再寫入。時間欄位同樣用鎖後重讀的最新值
+    // （編輯端可能正在改時間）。
+    if (isRegistrationClosed({ startAt, endAt })) {
+      return { outcome: "ended" }
     }
 
     let status: "CONFIRMED" | "WAITLISTED" = "CONFIRMED"

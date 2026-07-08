@@ -3,6 +3,7 @@
 import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { isRegistrationClosed } from "@/lib/event-time"
 import { insertRegistrationWithCapacityCheck } from "@/lib/registration"
 import {
   checkRateLimit,
@@ -59,6 +60,10 @@ export async function createRegistration(
     return { success: false, error: "此活動目前未開放報名" }
   }
 
+  if (isRegistrationClosed(event)) {
+    return { success: false, error: "此活動已結束，無法報名" }
+  }
+
   // 注意：這裡刻意不檢查 event.requirePayment。「繳費對帳」是規劃中的
   // 功能 #7（承辦人事後手動標記 isPaid，非線上金流），設計上報名流程
   // 不卡繳費、一律先成立，這是既定決策而非遺漏。
@@ -81,6 +86,9 @@ export async function createRegistration(
     if (result.outcome === "not_open") {
       // 上面的快速檢查通過後、取得行鎖前，活動剛好被關閉的邊界情況
       return { success: false, error: "此活動目前未開放報名" }
+    }
+    if (result.outcome === "ended") {
+      return { success: false, error: "此活動已結束，無法報名" }
     }
 
     const registration = result.registration

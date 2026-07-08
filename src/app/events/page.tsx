@@ -3,6 +3,7 @@ import { format } from "date-fns"
 import { Banknote, Calendar, MapPin, Users } from "lucide-react"
 
 import { prisma } from "@/lib/prisma"
+import { isRegistrationClosed } from "@/lib/event-time"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CopyRegisterLinkButton } from "@/components/copy-register-link-button"
@@ -62,9 +63,21 @@ export default async function EventsPage() {
                   <CardTitle className="min-w-0 break-words text-xl">
                     {event.title}
                   </CardTitle>
-                  <Badge className={statusBadgeClass[event.status]}>
-                    {statusLabel[event.status]}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge className={statusBadgeClass[event.status]}>
+                      {statusLabel[event.status]}
+                    </Badge>
+                    {/* 活動時間已過但狀態欄位還沒手動改成已截止/已取消時的
+                        視覺提示：與狀態徽章並列（不取代），「開放報名」＋
+                        「已結束」並排的違和感讓承辦人一眼看出該去關閉了。
+                        純提示，實際報名/報到攔截由後端交易內的時間判斷處理。 */}
+                    {(event.status === "DRAFT" || event.status === "OPEN") &&
+                      isRegistrationClosed(event) && (
+                        <Badge className="bg-muted text-muted-foreground">
+                          已結束
+                        </Badge>
+                      )}
+                  </div>
                 </CardHeader>
                 {/* 次要資訊用 text-muted-foreground（實色 #6D4C41，對白卡 7.7:1），
                     不用 opacity 降淡 */}

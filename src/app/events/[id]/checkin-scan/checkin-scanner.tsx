@@ -47,6 +47,14 @@ function toFeedback(result: CheckInActionResult): Feedback {
       return { variant: "error", message: "查無此報名資料" }
     case "not_confirmed":
       return { variant: "error", message: "此報名尚未確認，無法報到" }
+    case "outside_window":
+      return {
+        variant: "error",
+        message:
+          Date.now() < new Date(result.opensAt).getTime()
+            ? `報到尚未開放（活動當天 ${format(result.opensAt, "MM/dd")} 起可報到）`
+            : "活動已結束，報到時間已截止",
+      }
     case "already_checked_in":
       return {
         variant: "warning",

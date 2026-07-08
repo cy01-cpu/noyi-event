@@ -1,12 +1,16 @@
 import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { getCheckInWindow } from "@/lib/event-time"
 
 export type CheckInResult =
   | { success: true; name: string; eventTitle: string; checkedAt: Date }
   | { success: false; reason: "not_found" }
   | { success: false; reason: "event_mismatch" }
   | { success: false; reason: "not_confirmed"; status: string }
+  // 報到有效窗之外（活動當天 00:00 前／活動結束＋緩衝後），
+  // opensAt 讓介面能區分「還沒開放」與「已截止」給出對應訊息
+  | { success: false; reason: "outside_window"; opensAt: Date; closesAt: Date }
   | {
       success: false
       reason: "already_checked_in"
@@ -41,6 +45,15 @@ export async function performCheckIn(
       reason: "not_confirmed",
       status: registration.status,
     }
+  }
+
+  // 時間邊界：報到只在有效窗內寫入（活動當天 00:00 ～ 結束後 2 小時，
+  // 見 src/lib/event-time.ts）。活動結束一個月後誤掃舊 QR Code 不該
+  // 再記一筆報到，出席統計會失真。
+  const { opensAt, closesAt } = getCheckInWindow(registration.event)
+  const now = new Date()
+  if (now < opensAt || now > closesAt) {
+    return { success: false, reason: "outside_window", opensAt, closesAt }
   }
 
   try {

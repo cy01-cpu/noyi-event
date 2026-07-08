@@ -2,6 +2,7 @@ import { format } from "date-fns"
 import { Calendar, MapPin, Users } from "lucide-react"
 
 import { prisma } from "@/lib/prisma"
+import { isRegistrationClosed } from "@/lib/event-time"
 import { RegistrationForm } from "@/components/registration-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -28,6 +29,18 @@ export default async function RegisterPage({
       <div className="theme-orange flex-1 bg-background text-foreground">
         <div className="mx-auto max-w-2xl px-4 py-16 text-center">
           <p className="text-lg font-medium">此活動目前未開放報名</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 時間邊界：活動結束後即使狀態仍是 OPEN（承辦人忘了截止），
+  // 也不再顯示報名表單。Server Action 內另有相同的硬性檢查。
+  if (isRegistrationClosed(event)) {
+    return (
+      <div className="theme-orange flex-1 bg-background text-foreground">
+        <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+          <p className="text-lg font-medium">此活動已結束，無法報名</p>
         </div>
       </div>
     )

@@ -2,6 +2,7 @@ import { format } from "date-fns"
 import { cookies } from "next/headers"
 
 import { prisma } from "@/lib/prisma"
+import { getCheckInWindow } from "@/lib/event-time"
 import { ADMIN_SESSION_COOKIE, verifySessionToken } from "@/lib/admin-auth"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -70,6 +71,11 @@ export default async function CheckinTokenPage({
   }
 
   const checkIn = registration.checkIn
+  // 報到有效窗（活動當天 00:00 ～ 結束後 2 小時）。這裡的判斷只是
+  // 介面引導——把按鈕換成說明文字；performCheckIn 內另有相同的硬性檢查。
+  const { opensAt, closesAt } = getCheckInWindow(registration.event)
+  const now = new Date()
+  const withinWindow = now >= opensAt && now <= closesAt
   const canCheckIn = registration.status === "CONFIRMED" && !checkIn
 
   return (
@@ -99,7 +105,16 @@ export default async function CheckinTokenPage({
               )}
             </div>
 
+            {canCheckIn && !withinWindow && (
+              <p className="rounded-lg bg-muted px-4 py-3 text-base text-muted-foreground">
+                {now < opensAt
+                  ? `報到尚未開放，活動當天（${format(opensAt, "yyyy/MM/dd")}）起可報到。`
+                  : "活動已結束，報到時間已截止。"}
+              </p>
+            )}
+
             {canCheckIn &&
+              withinWindow &&
               (isStaff ? (
                 <ConfirmCheckInButton token={registration.token} />
               ) : (

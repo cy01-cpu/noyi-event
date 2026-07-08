@@ -21,6 +21,12 @@ export function ConfirmCheckInButton({ token }: { token: string }) {
         router.refresh()
       } else if (result.reason === "unauthorized") {
         setError("通行碼驗證已失效，請重新登入後再操作")
+      } else if (result.reason === "outside_window") {
+        setError(
+          Date.now() < new Date(result.opensAt).getTime()
+            ? "報到尚未開放，活動當天才能報到"
+            : "活動已結束，報到時間已截止"
+        )
       } else {
         setError("報到失敗，請改用掃描頁或聯絡系統管理者")
       }

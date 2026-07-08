@@ -120,6 +120,17 @@ export default async function AttendeesPage({
                     {r.email}
                   </p>
 
+                  {/* 所屬分行/單位：選填欄位，沒填就不顯示這行
+                      （與下方自訂欄位答案同一套「未填不顯示」處理方式） */}
+                  {r.branch && (
+                    <p className="text-base">
+                      <span className="text-muted-foreground">
+                        所屬分行/單位：
+                      </span>
+                      {r.branch}
+                    </p>
+                  )}
+
                   {/* 自訂報名欄位答案：選填欄位沒填就整行不顯示，避免
                       每張卡片都印一堆「未填」造成雜訊（見 event-form-field.ts） */}
                   {formFields.length > 0 && (

@@ -37,7 +37,6 @@ export default function NewEventPage() {
               startAt: undefined as unknown as Date,
               endAt: undefined,
               capacity: undefined,
-              isPublic: true,
               requirePayment: false,
               amount: undefined,
               status: "DRAFT",

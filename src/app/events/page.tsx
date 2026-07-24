@@ -35,6 +35,18 @@ export default async function EventsPage() {
     orderBy: { createdAt: "desc" },
   })
 
+  // 各活動目前的已報名人數（CONFIRMED 筆數，與名額下限保護用的計算
+  // 基準一致），單一 groupBy 查詢取得全部活動的計數，避免逐一活動
+  // 查一次造成 N+1。
+  const confirmedCounts = await prisma.registration.groupBy({
+    by: ["eventId"],
+    where: { status: "CONFIRMED" },
+    _count: true,
+  })
+  const confirmedCountByEventId = new Map(
+    confirmedCounts.map((c) => [c.eventId, c._count])
+  )
+
   return (
     <div className="theme-orange flex-1 bg-background text-foreground">
       <div className="mx-auto max-w-5xl px-4 py-8">
@@ -96,8 +108,8 @@ export default async function EventsPage() {
                     <Users className="size-5 shrink-0 text-brand-orange-primary" />
                     <span>
                       {event.capacity !== null
-                        ? `名額 ${event.capacity} 人`
-                        : "名額不限"}
+                        ? `已報名 ${confirmedCountByEventId.get(event.id) ?? 0} ／ 名額 ${event.capacity} 人`
+                        : `已報名 ${confirmedCountByEventId.get(event.id) ?? 0} 人（名額不限）`}
                     </span>
                   </div>
                   <div className="flex items-center gap-2.5">

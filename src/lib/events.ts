@@ -19,7 +19,6 @@ export type GuardedEventUpdateData = {
   startAt: Date
   endAt: Date | null
   capacity: number | null
-  isPublic: boolean
   requirePayment: boolean
   amountInCents: number | null
   status: EventStatus
@@ -145,7 +144,6 @@ export async function updateEventWithCapacityGuard(
         startAt: data.startAt,
         endAt: data.endAt,
         capacity: data.capacity,
-        isPublic: data.isPublic,
         requirePayment,
         amount,
         status: data.status,

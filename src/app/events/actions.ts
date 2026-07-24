@@ -55,7 +55,6 @@ export async function createEvent(
         startAt: data.startAt,
         endAt: data.endAt ?? null,
         capacity: data.capacity ?? null,
-        isPublic: data.isPublic,
         requirePayment: data.requirePayment,
         amount: amountInCents,
         status: data.status,

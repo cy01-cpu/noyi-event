@@ -97,6 +97,34 @@ export async function cancelRegistration(
   }
 }
 
+type UndoCheckInResult =
+  | { success: true }
+  | { success: false; error: string }
+
+// 取消報到（誤刷復原用）。直接刪除 CheckIn 紀錄即可讓該報名回到「尚未
+// 報到」，之後可重新掃碼——比照繳費標記類按鈕的簡單模式，不另外留稽核
+// 欄位（何時、被誰取消報到，這裡不記錄）。
+export async function undoCheckIn(
+  registrationId: string
+): Promise<UndoCheckInResult> {
+  try {
+    const registration = await prisma.registration.findUnique({
+      where: { id: registrationId },
+      select: { eventId: true },
+    })
+    if (!registration) {
+      return { success: false, error: "找不到這筆報名" }
+    }
+
+    await prisma.checkIn.delete({ where: { registrationId } })
+
+    revalidatePath(`/events/${registration.eventId}/attendees`)
+    return { success: true }
+  } catch {
+    return { success: false, error: "這筆報名尚未報到，或取消報到時發生錯誤" }
+  }
+}
+
 type ToggleRefundResult =
   | { success: true }
   | { success: false; error: string }

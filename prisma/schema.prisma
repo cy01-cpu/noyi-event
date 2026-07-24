@@ -7,14 +7,13 @@ datasource db {
 }
 
 model Event {
-  id            String         @id @default(cuid())
+  id            String         @id @default(uuid())
   title         String
   description   String?
   location      String?
   startAt       DateTime
   endAt         DateTime?
   capacity      Int?
-  isPublic      Boolean        @default(true)
   requirePayment Boolean       @default(false)
   amount        Int?
   status        EventStatus    @default(DRAFT)
@@ -61,7 +60,7 @@ model Registration {
   phone     String?
   branch    String?
   note      String?
-  token     String             @unique @default(cuid())
+  token     String             @unique @default(uuid())
   isPaid    Boolean            @default(false)
   paidAt    DateTime?
   // 繳費稽核軌跡：標記已繳費時由操作者自填站別/姓名（仿 CheckIn.gate 的

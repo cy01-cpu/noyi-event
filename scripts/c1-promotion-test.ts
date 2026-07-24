@@ -39,7 +39,7 @@ function reg(n: number) {
 }
 
 function editData(
-  event: { title: string; description: string | null; location: string | null; startAt: Date; endAt: Date | null; capacity: number | null; isPublic: boolean; requirePayment: boolean; amount: number | null; status: string },
+  event: { title: string; description: string | null; location: string | null; startAt: Date; endAt: Date | null; capacity: number | null; requirePayment: boolean; amount: number | null; status: string },
   overrides: Partial<GuardedEventUpdateData>
 ): GuardedEventUpdateData {
   return {
@@ -49,7 +49,6 @@ function editData(
     startAt: event.startAt,
     endAt: event.endAt,
     capacity: event.capacity,
-    isPublic: event.isPublic,
     requirePayment: event.requirePayment,
     amountInCents: event.amount,
     status: event.status as GuardedEventUpdateData["status"],
@@ -75,7 +74,6 @@ async function main() {
       title: `${PREFIX}${new Date().toISOString()}`,
       startAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       capacity: 2,
-      isPublic: false,
       status: "OPEN",
     },
   })

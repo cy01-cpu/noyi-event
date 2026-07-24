@@ -48,7 +48,6 @@ export async function updateEvent(
       startAt: data.startAt,
       endAt: data.endAt ?? null,
       capacity: data.capacity ?? null,
-      isPublic: data.isPublic,
       requirePayment: data.requirePayment,
       amountInCents:
         data.requirePayment && data.amount !== undefined

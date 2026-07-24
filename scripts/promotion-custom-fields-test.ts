@@ -33,7 +33,6 @@ async function main() {
     data: {
       title: `${PREFIX}${new Date().toISOString()}`,
       startAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isPublic: false,
       status: "OPEN",
       capacity: 1,
       formFields: {

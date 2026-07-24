@@ -36,7 +36,6 @@ function createEvent(name: string, startAt: Date, endAt: Date | null) {
       title: `${PREFIX}${name}`,
       startAt,
       endAt,
-      isPublic: false,
       status: "OPEN",
     },
   })

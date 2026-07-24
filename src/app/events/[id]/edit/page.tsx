@@ -44,7 +44,6 @@ export default async function EditEventPage({
         startAt: event.startAt,
         endAt: event.endAt ?? undefined,
         capacity: event.capacity ?? undefined,
-        isPublic: event.isPublic,
         requirePayment: event.requirePayment,
         // 資料庫存「分」，表單顯示「元」
         amount: event.amount !== null ? event.amount / 100 : undefined,

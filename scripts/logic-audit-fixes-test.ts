@@ -42,7 +42,6 @@ async function main() {
       startAt: new Date(Date.now() - 8 * HOUR),
       endAt: new Date(Date.now() - 6 * HOUR),
       capacity: 1,
-      isPublic: false,
       status: "OPEN",
     },
   })
@@ -101,7 +100,6 @@ async function main() {
       startAt: currentEvent.startAt,
       endAt: currentEvent.endAt,
       capacity: 5,
-      isPublic: currentEvent.isPublic,
       requirePayment: currentEvent.requirePayment,
       amountInCents: currentEvent.amount,
       status: currentEvent.status,

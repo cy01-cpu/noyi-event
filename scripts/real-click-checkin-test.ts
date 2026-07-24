@@ -40,7 +40,6 @@ async function main() {
       title: `${PREFIX}結束已久`,
       startAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), // 8 天前
       endAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 天前結束
-      isPublic: false,
       status: "OPEN",
     },
   })
@@ -58,7 +57,6 @@ async function main() {
       title: `${PREFIX}進行中`,
       startAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 小時前開始
       endAt: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 小時後結束
-      isPublic: false,
       status: "OPEN",
     },
   })

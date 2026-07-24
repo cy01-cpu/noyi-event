@@ -49,7 +49,6 @@ async function createTestEvent(capacity: number | null) {
       title: `${TEST_TITLE_PREFIX}${new Date().toISOString()}`,
       startAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       capacity,
-      isPublic: false,
       status: "OPEN",
     },
   })
@@ -66,7 +65,6 @@ function editDataFrom(
     startAt: event.startAt,
     endAt: event.endAt,
     capacity: event.capacity,
-    isPublic: event.isPublic,
     requirePayment: event.requirePayment,
     amountInCents: event.amount,
     status: event.status,

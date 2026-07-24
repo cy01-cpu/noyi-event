@@ -16,7 +16,6 @@ const eventBaseFields = {
   startAt: z.date("請選擇活動開始時間"),
   endAt: z.date().optional(),
   capacity: z.number("名額必須是數字").int("名額必須是整數").positive("名額必須大於 0").optional(),
-  isPublic: z.boolean(),
   requirePayment: z.boolean(),
   amount: z.number("金額必須是數字").positive("金額必須大於 0").optional(),
 };

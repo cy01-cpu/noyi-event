@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { prisma } from "@/lib/prisma"
+import { getCheckInWindow } from "@/lib/event-time"
 import { AttendeesList } from "./attendees-list"
 import { PaidOperatorProvider } from "./paid-operator"
 
@@ -54,12 +55,17 @@ export default async function AttendeesPage({
       ? `NT$${(event.amount / 100).toLocaleString("zh-TW")}`
       : null
 
+  // 報到有效窗是否已關閉：關閉後「取消報到」一律不給操作
+  // （見 undo-checkin-button.tsx／actions.ts 的 undoCheckIn）
+  const checkInWindowClosed = new Date() > getCheckInWindow(event).closesAt
+
   const attendeeList = (
     <AttendeesList
       registrations={sorted}
       formFields={formFields}
       requirePayment={event.requirePayment}
       amountLabel={amountLabel}
+      checkInWindowClosed={checkInWindowClosed}
     />
   )
 

@@ -40,11 +40,13 @@ export function AttendeesList({
   formFields,
   requirePayment,
   amountLabel,
+  checkInWindowClosed,
 }: {
   registrations: RegistrationWithCheckIn[]
   formFields: FormFieldSummary[]
   requirePayment: boolean
   amountLabel: string | null
+  checkInWindowClosed: boolean
 }) {
   const [query, setQuery] = useState("")
 
@@ -155,7 +157,11 @@ export function AttendeesList({
                       {format(r.checkIn.checkedAt, "yyyy/MM/dd HH:mm")}
                       {r.checkIn.gate ? `・${r.checkIn.gate}` : ""}
                     </span>
-                    <UndoCheckInButton registrationId={r.id} name={r.name} />
+                    <UndoCheckInButton
+                      registrationId={r.id}
+                      name={r.name}
+                      windowClosed={checkInWindowClosed}
+                    />
                   </>
                 ) : (
                   <Badge className="bg-muted text-muted-foreground">

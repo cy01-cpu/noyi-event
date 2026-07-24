@@ -1,6 +1,7 @@
 "use server"
 
 import { Prisma } from "@prisma/client"
+import { revalidatePath } from "next/cache"
 
 import { prisma } from "@/lib/prisma"
 import { isRegistrationClosed } from "@/lib/event-time"
@@ -103,6 +104,11 @@ export async function createRegistration(
     }
 
     const registration = result.registration
+
+    // /events 是靜態預渲染頁，「已報名 X」人數只在有 revalidate 時才會更新
+    // （見 src/app/events/page.tsx 的 groupBy 統計）；新增報名會改變這個
+    // 數字，跟 createEvent/updateEvent 一樣要主動觸發重新整理。
+    revalidatePath("/events")
 
     try {
       await sendRegistrationConfirmation(registration, event)

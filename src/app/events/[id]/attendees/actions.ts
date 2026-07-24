@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { prisma } from "@/lib/prisma"
+import { getCheckInWindow } from "@/lib/event-time"
 import { sendPromotionEmails } from "@/lib/promotion"
 import {
   cancelRegistrationAndPromote,
@@ -91,6 +92,9 @@ export async function cancelRegistration(
 
     revalidatePath(`/events/${result.event.id}/attendees`)
     revalidatePath(`/events/${result.event.id}/register`)
+    // 取消 CONFIRMED 報名（或候補自動遞補）會改變「已報名 X」的計算基準，
+    // /events 是靜態預渲染頁，同一套理由見 register/actions.ts 的說明。
+    revalidatePath("/events")
     return { success: true, promotedCount: result.promoted.length }
   } catch {
     return { success: false, error: "取消報名時發生錯誤，請稍後再試" }
@@ -104,16 +108,29 @@ type UndoCheckInResult =
 // 取消報到（誤刷復原用）。直接刪除 CheckIn 紀錄即可讓該報名回到「尚未
 // 報到」，之後可重新掃碼——比照繳費標記類按鈕的簡單模式，不另外留稽核
 // 欄位（何時、被誰取消報到，這裡不記錄）。
+//
+// 報到有效窗關閉後一律拒絕：窗口關閉代表對方已經無法重新掃碼報到，
+// 這時候取消只會讓「已報到」的正確紀錄永久消失且無法挽回，跟報名/
+// 報到本身「窗口外一律擋下」是同一套時間邊界原則，不開放「允許但警告」
+// 的例外——畫面上按鈕本身在窗口關閉後就不會出現（見 UndoCheckInButton），
+// 這裡是繞過前端時的硬性防線。
 export async function undoCheckIn(
   registrationId: string
 ): Promise<UndoCheckInResult> {
   try {
     const registration = await prisma.registration.findUnique({
       where: { id: registrationId },
-      select: { eventId: true },
+      select: { eventId: true, event: { select: { startAt: true, endAt: true } } },
     })
     if (!registration) {
       return { success: false, error: "找不到這筆報名" }
+    }
+
+    if (new Date() > getCheckInWindow(registration.event).closesAt) {
+      return {
+        success: false,
+        error: "報到時間已截止，取消後對方將無法重新報到，已擋下此操作",
+      }
     }
 
     await prisma.checkIn.delete({ where: { registrationId } })
